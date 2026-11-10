@@ -40,6 +40,12 @@ final class SeededGeneratorTests: XCTestCase {
         )
     }
 
+    func testCopyKeepsItsPlaceInTheSequence() {
+        var original = SeededGenerator(seed: Seed(0))
+        var copy = original
+        XCTAssertEqual(original.next(), copy.next())
+    }
+
     func testDifferentSeedsDivergeOnTheFirstDraw() {
         var first = SeededGenerator(seed: Seed(0))
         var second = SeededGenerator(seed: Seed(1))
