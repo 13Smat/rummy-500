@@ -133,4 +133,37 @@ final class AppShellTests: XCTestCase {
         XCTAssertFalse(scene.hasAnotherStep)
         XCTAssertEqual(scene.steppingForward(), scene)
     }
+
+    func testComputerMatchStepsAndFinishes() {
+        let scene = ComputerScene.load(seed: 0)
+        XCTAssertEqual(scene.yourHand.count, 13)
+        XCTAssertEqual(scene.computerHand.count, 13)
+        XCTAssertEqual(scene.stockCount, 25)
+        XCTAssertEqual(scene.discard.count, 1)
+        XCTAssertEqual(scene.lastPlay, "Dealt the hand")
+        XCTAssertEqual(scene.matchStatus, "Playing")
+        XCTAssertEqual(scene.plays, [])
+        XCTAssertTrue(scene.canStep)
+        XCTAssertNil(scene.yourHandScore)
+
+        let next = scene.steppingForward()
+        XCTAssertEqual(next.plays.count, 1)
+        XCTAssertEqual(next.lastPlay, next.plays[0])
+        XCTAssertTrue(
+            next.lastPlay.hasPrefix("You drew") || next.lastPlay.hasPrefix("You took")
+        )
+        XCTAssertEqual(ComputerScene.load(seed: 0).steppingForward(), next)
+
+        let (kept, error) = ComputerScene.load(seedText: "nope", keeping: scene)
+        XCTAssertEqual(kept, scene)
+        XCTAssertEqual(error, "Enter a whole number from 0.")
+
+        let finished = scene.autoplaying()
+        XCTAssertFalse(finished.canStep)
+        XCTAssertEqual(finished.steppingForward(), finished)
+        XCTAssertTrue(finished.matchStatus == "You win" || finished.matchStatus == "Computer wins")
+        XCTAssertGreaterThanOrEqual(max(finished.yourMatchTotal, finished.computerMatchTotal), 500)
+        XCTAssertGreaterThan(finished.handsPlayed, 0)
+        XCTAssertEqual(ComputerScene.load(seed: 0).autoplaying(), finished)
+    }
 }

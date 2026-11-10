@@ -54,6 +54,8 @@ struct DealDebugView: View {
                     .padding(.top, 12)
                 TurnDebugView()
                     .padding(.top, 12)
+                ComputerDebugView()
+                    .padding(.top, 12)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
