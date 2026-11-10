@@ -47,15 +47,30 @@ final class TableScreenshotTests: XCTestCase {
 
     @MainActor
     private func snapshot<Content: View>(_ content: Content, size: CGSize) -> UIImage? {
+        let candidates = [renderedImage(content, size: size), hostedImage(content, size: size)]
+        return candidates.compactMap { $0 }.max { PixelCount($0).cardFace < PixelCount($1).cardFace }
+    }
+
+    @MainActor
+    private func renderedImage<Content: View>(_ content: Content, size: CGSize) -> UIImage? {
+        let page = content.frame(width: size.width, height: size.height)
+        let renderer = ImageRenderer(content: page)
+        renderer.scale = 2
+        renderer.proposedSize = ProposedViewSize(width: size.width, height: size.height)
+        return renderer.uiImage
+    }
+
+    @MainActor
+    private func hostedImage<Content: View>(_ content: Content, size: CGSize) -> UIImage? {
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let controller = UIHostingController(rootView: content)
         controller.safeAreaRegions = []
         let bounds = CGRect(origin: .zero, size: size)
-        controller.view.bounds = bounds
-        controller.view.frame = bounds
-        controller.view.backgroundColor = .clear
-        let window = UIWindow(frame: bounds)
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: bounds)
+        window.frame = bounds
         window.rootViewController = controller
         window.makeKeyAndVisible()
+        controller.view.frame = bounds
         window.layoutIfNeeded()
         let drawn = XCTestExpectation(description: "SwiftUI draws the table")
         DispatchQueue.main.async {
@@ -66,8 +81,10 @@ final class TableScreenshotTests: XCTestCase {
         format.scale = 2
         format.opaque = true
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        let image = renderer.image { _ in
-            window.drawHierarchy(in: bounds, afterScreenUpdates: true)
+        let image = renderer.image { context in
+            if !window.drawHierarchy(in: bounds, afterScreenUpdates: true) {
+                window.layer.render(in: context.cgContext)
+            }
         }
         window.isHidden = true
         return image
@@ -114,7 +131,8 @@ private struct PixelCount {
                 bitsPerComponent: 8,
                 bytesPerRow: width * 4,
                 space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue
+                    | CGImageAlphaInfo.premultipliedLast.rawValue
             ) else {
                 return
             }

@@ -14,7 +14,7 @@ struct TableScreen: View {
             status(scene)
             presetMenu
             opponent(scene)
-            ScrollView {
+            DragStrip(axis: .vertical) {
                 VStack(alignment: .leading, spacing: 12) {
                     meldBlock(
                         "Computer's melds",
@@ -29,7 +29,6 @@ struct TableScreen: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             piles(scene)
                 .layoutPriority(1)
             yourHand(scene)
@@ -42,18 +41,20 @@ struct TableScreen: View {
     }
 
     private var presetMenu: some View {
-        Menu {
+        HStack(spacing: 6) {
             ForEach(TablePreset.allCases) { item in
                 Button(item.title) {
                     preset = item
                 }
-            }
-        } label: {
-            Text(preset.title)
-                .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 12)
+                .font(.caption.weight(item == preset ? .bold : .medium))
+                .padding(.horizontal, 8)
                 .padding(.vertical, 6)
-                .background(Color.white.opacity(0.16), in: Capsule())
+                .background(
+                    Color.white.opacity(item == preset ? 0.22 : 0.08),
+                    in: Capsule()
+                )
+                .accessibilityAddTraits(item == preset ? .isSelected : [])
+            }
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -146,7 +147,7 @@ struct TableScreen: View {
             Text(meld.kindLabel)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.8))
-            ScrollView(.horizontal, showsIndicators: false) {
+            DragStrip(axis: .horizontal, height: TableChrome.cardHeight + 28) {
                 HStack(alignment: .center, spacing: 6) {
                     ForEach(meld.cards, id: \.card) { entry in
                         meldCard(entry, in: meld)
@@ -154,7 +155,6 @@ struct TableScreen: View {
                 }
                 .padding(.vertical, 4)
             }
-            .frame(height: TableChrome.cardHeight + 28)
         }
     }
 
@@ -201,7 +201,7 @@ struct TableScreen: View {
                 Text("Discard \(scene.discard.count)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
-                ScrollView(.horizontal) {
+                DragStrip(axis: .horizontal, height: TableChrome.cardHeight) {
                     HStack(spacing: TableChrome.discardStride - TableChrome.cardWidth) {
                         ForEach(scene.discard, id: \.self) { card in
                             CardFace(card: card)
@@ -209,7 +209,6 @@ struct TableScreen: View {
                     }
                     .padding(.trailing, 2)
                 }
-                .frame(height: TableChrome.cardHeight)
                 .accessibilityIdentifier("discard")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -221,7 +220,7 @@ struct TableScreen: View {
             Text("Your hand \(scene.yourHand.count)")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
-            ScrollView(.horizontal) {
+            DragStrip(axis: .horizontal, height: TableChrome.cardHeight) {
                 HStack(spacing: TableChrome.handGap) {
                     ForEach(Array(scene.yourHand.enumerated()), id: \.element) { index, card in
                         CardFace(card: card)
@@ -232,7 +231,6 @@ struct TableScreen: View {
                     }
                 }
             }
-            .frame(height: TableChrome.cardHeight)
             .accessibilityIdentifier("your-hand")
         }
     }
@@ -273,6 +271,80 @@ struct CardFace: View {
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(CardLabel.spoken(card))
+    }
+}
+
+private struct StripLengthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct DragStrip<Content: View>: View {
+    var axis: Axis
+    var height: CGFloat?
+    var content: Content
+    @State private var resting: CGFloat = 0
+    @GestureState private var drag: CGFloat = 0
+    @State private var contentLength: CGFloat = 0
+
+    init(axis: Axis, height: CGFloat? = nil, @ViewBuilder content: () -> Content) {
+        self.axis = axis
+        self.height = height
+        self.content = content()
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let shown = clamped(resting + drag, viewport: length(of: geo.size))
+            content
+                .fixedSize(
+                    horizontal: axis == .horizontal,
+                    vertical: axis == .vertical
+                )
+                .background(lengthReader)
+                .offset(x: axis == .horizontal ? shown : 0, y: axis == .vertical ? shown : 0)
+                .frame(
+                    width: geo.size.width,
+                    height: axis == .horizontal ? (height ?? geo.size.height) : geo.size.height,
+                    alignment: axis == .horizontal ? .leading : .top
+                )
+                .clipped()
+                .gesture(pan(viewport: length(of: geo.size)))
+                .onPreferenceChange(StripLengthKey.self) { contentLength = $0 }
+        }
+        .frame(maxWidth: .infinity, maxHeight: height == nil ? .infinity : nil)
+        .frame(height: height)
+    }
+
+    private func length(of size: CGSize) -> CGFloat {
+        axis == .horizontal ? size.width : size.height
+    }
+
+    private var lengthReader: some View {
+        GeometryReader { inner in
+            Color.clear.preference(
+                key: StripLengthKey.self,
+                value: axis == .horizontal ? inner.size.width : inner.size.height
+            )
+        }
+    }
+
+    private func clamped(_ value: CGFloat, viewport: CGFloat) -> CGFloat {
+        let limit = min(0, viewport - contentLength)
+        return min(0, max(limit, value))
+    }
+
+    private func pan(viewport: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 8)
+            .updating($drag) { value, state, _ in
+                state = axis == .horizontal ? value.translation.width : value.translation.height
+            }
+            .onEnded { value in
+                let delta = axis == .horizontal ? value.translation.width : value.translation.height
+                resting = clamped(resting + delta, viewport: viewport)
+            }
     }
 }
 
