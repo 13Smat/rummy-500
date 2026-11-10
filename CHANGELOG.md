@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The iPhone table shows your hand face up, the computer's hand face down, the stock, every discard, both players' melds, the match scores, and whose turn it is. A menu loads a fresh deal, a mid-hand with layoffs, or a long discard pile. Debug lists stay behind a Debug button.
 - The computer plays a legal Rummy 500 hand from its own cards, the spread discard, the table, the stock count, and the match totals. It can take a deeper discard when that card melds at once and the extra cards are worth it. It lays down, lays off, and goes out. A debug build steps through a seeded match with Next move and Auto-play.
 - A turn in `RummyEngine` is a draw, then melds and layoffs, then one discard. The draw is the top of the stock, or a discard plus every card above it. The chosen discard has to be melded or laid off before any other move. Going out, including by discarding the last card, ends the hand. An empty stock ends the hand when the player does not take a usable discard. The score still comes from `HandResult`.
 - A debug build steps through a scripted hand and shows the stock, the spread discard, both hands, the table, whose turn it is, and the score.

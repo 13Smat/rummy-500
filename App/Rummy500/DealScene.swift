@@ -18,12 +18,12 @@ struct DealScene: Equatable {
             seed: seed,
             dealerName: seatName(deal.dealer),
             leaderName: seatName(deal.leader),
-            yourHand: deal.you.cards.map(cardName),
+            yourHand: deal.you.cards.map(CardLabel.spoken),
             yourMelds: meldLines(deal.you.cards, player: .you),
-            computerHand: deal.computer.cards.map(cardName),
+            computerHand: deal.computer.cards.map(CardLabel.spoken),
             computerMelds: meldLines(deal.computer.cards, player: .computer),
             stockCount: deal.stock.count,
-            discard: deal.discard.bottomToTop.map(cardName)
+            discard: deal.discard.bottomToTop.map(CardLabel.spoken)
         )
     }
 
@@ -50,55 +50,7 @@ struct DealScene: Equatable {
 
     private static func meldLine(_ meld: Meld) -> String {
         let kind = meld.kind == .set ? "Set" : "Run"
-        let names = meld.cards.map(cardName).joined(separator: ", ")
+        let names = meld.cards.map(CardLabel.spoken).joined(separator: ", ")
         return "\(kind): \(names)"
-    }
-
-    private static func cardName(_ card: Card) -> String {
-        "\(rankName(card.rank)) of \(suitName(card.suit))"
-    }
-
-    private static func rankName(_ rank: Rank) -> String {
-        switch rank {
-        case .ace:
-            return "ace"
-        case .two:
-            return "2"
-        case .three:
-            return "3"
-        case .four:
-            return "4"
-        case .five:
-            return "5"
-        case .six:
-            return "6"
-        case .seven:
-            return "7"
-        case .eight:
-            return "8"
-        case .nine:
-            return "9"
-        case .ten:
-            return "10"
-        case .jack:
-            return "jack"
-        case .queen:
-            return "queen"
-        case .king:
-            return "king"
-        }
-    }
-
-    private static func suitName(_ suit: Suit) -> String {
-        switch suit {
-        case .clubs:
-            return "clubs"
-        case .diamonds:
-            return "diamonds"
-        case .hearts:
-            return "hearts"
-        case .spades:
-            return "spades"
-        }
     }
 }
