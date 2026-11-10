@@ -27,6 +27,12 @@ need(spec["packages"]["RummyEngine"]["path"] == "Packages/RummyEngine", "engine 
 need(app_base["PRODUCT_BUNDLE_IDENTIFIER"] == "com.13smat.rummy500", "bundle id")
 need(str(app_base["TARGETED_DEVICE_FAMILY"]) == "1", "iPhone device family")
 need(app_base["INFOPLIST_KEY_UILaunchStoryboardName"] == "LaunchScreen", "launch storyboard")
+need(app_base["GENERATE_INFOPLIST_FILE"] == "YES", "generated Info.plist")
+need(
+    app_base["INFOPLIST_KEY_ITSAppUsesNonExemptEncryption"] == "NO",
+    "export compliance",
+)
+need(str(base["MARKETING_VERSION"]) == "0.1.0", "marketing version")
 need(base["CODE_SIGNING_ALLOWED"] == "NO", "signing stays off")
 need(app_base["CODE_SIGNING_ALLOWED"] == "NO", "app target signing stays off")
 need(app_base["CODE_SIGN_IDENTITY"] == "-", "app target has no signing identity")

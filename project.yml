@@ -35,6 +35,7 @@ targets:
         CODE_SIGNING_ALLOWED: "NO"
         CODE_SIGNING_REQUIRED: "NO"
         GENERATE_INFOPLIST_FILE: "YES"
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: "NO"
         INFOPLIST_KEY_CFBundleDisplayName: Rummy 500
         INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait

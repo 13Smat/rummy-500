@@ -15,7 +15,7 @@ You need Xcode 26 and XcodeGen 2.46.0.
 
 The launch screen shows Rummy 500. The table shows your cards face up, the computer's cards face down, the stock, the spread discard, the melds, the scores, and whose turn it is. Choose Fresh deal, Mid-hand, or Long discard to change the position. A debug build adds a Debug button. That screen lists a seeded deal, a sample score, and a scripted hand. Press Next to take one draw, meld, layoff, or discard. The last step shows both hand scores and the match totals. Under the scripted hand, the debug build shows a computer match. Press Next move for one action, or Auto-play to finish the match.
 
-Signing is off until a later Apple ticket. Run the app in the simulator. `project.yml` is the project file we keep. `Rummy500.xcodeproj` is generated, and git ignores it.
+Run the app in the simulator. That build is unsigned. `docs/TESTFLIGHT.md` is how you upload a signed build to your iPhone. `project.yml` is the project file we keep. `Rummy500.xcodeproj` is generated, and git ignores it.
 
 ## Run the engine tests
 

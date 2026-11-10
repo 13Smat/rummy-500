@@ -14,6 +14,10 @@ fi
 
 python3 scripts/check_project_yml.py
 python3 scripts/check_docs.py
+python3 scripts/check_app_icon.py
+python3 scripts/check_asc_secrets.py --self-test
+python3 scripts/write_asc_key.py --self-test
+python3 scripts/check_testflight_workflow.py
 
 if grep -R -E -n 'import (UIKit|SwiftUI|Foundation|Darwin|AppKit|CoreGraphics|Combine)' Packages/RummyEngine/Sources; then
   echo "Engine sources import a framework they must not use." >&2

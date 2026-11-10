@@ -27,21 +27,18 @@ jobs:
   app:
     name: iOS simulator
     runs-on: macos-26
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
       - name: Install XcodeGen
-        run: |
-          set -euo pipefail
-          curl -fsSL -o /tmp/xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip
-          unzip -q /tmp/xcodegen.zip -d /tmp/xcodegen-dist
-          sudo /tmp/xcodegen-dist/xcodegen/install.sh /usr/local
-          xcodegen --version
+        run: ./scripts/install-xcodegen.sh
       - name: Generate the project, build the app, and run tests
         run: ./scripts/ios-ci.sh
+      - name: Archive an unsigned Release build
+        run: ./scripts/archive-unsigned-release.sh
       - name: Upload table screenshots
         if: always()
         uses: actions/upload-artifact@v4
