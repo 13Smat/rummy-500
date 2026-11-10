@@ -6,7 +6,9 @@ struct DealScene: Equatable {
     let dealerName: String
     let leaderName: String
     let yourHand: [String]
+    let yourMelds: [String]
     let computerHand: [String]
+    let computerMelds: [String]
     let stockCount: Int
     let discard: [String]
 
@@ -17,7 +19,9 @@ struct DealScene: Equatable {
             dealerName: seatName(deal.dealer),
             leaderName: seatName(deal.leader),
             yourHand: deal.you.cards.map(cardName),
+            yourMelds: meldLines(deal.you.cards, player: .you),
             computerHand: deal.computer.cards.map(cardName),
+            computerMelds: meldLines(deal.computer.cards, player: .computer),
             stockCount: deal.stock.count,
             discard: deal.discard.bottomToTop.map(cardName)
         )
@@ -38,6 +42,16 @@ struct DealScene: Equatable {
         case .computer:
             return "Computer"
         }
+    }
+
+    private static func meldLines(_ cards: [Card], player: Seat) -> [String] {
+        Meld.largestGroups(in: cards, playedBy: player).map(meldLine)
+    }
+
+    private static func meldLine(_ meld: Meld) -> String {
+        let kind = meld.kind == .set ? "Set" : "Run"
+        let names = meld.cards.map(cardName).joined(separator: ", ")
+        return "\(kind): \(names)"
     }
 
     private static func cardName(_ card: Card) -> String {

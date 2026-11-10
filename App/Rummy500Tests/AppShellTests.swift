@@ -30,6 +30,28 @@ final class AppShellTests: XCTestCase {
         XCTAssertNotEqual(DealScene.load(seed: 1).yourHand, scene.yourHand)
     }
 
+    func testSeededSceneListsLegalMelds() {
+        let scene = DealScene.load(seed: 0)
+        XCTAssertEqual(scene.yourMelds, [])
+        XCTAssertEqual(
+            scene.computerMelds,
+            ["Run: 5 of clubs, 6 of clubs, 7 of clubs, 8 of clubs"]
+        )
+        let richer = DealScene.load(seed: 11)
+        XCTAssertEqual(
+            richer.yourMelds,
+            [
+                "Set: 2 of clubs, 2 of diamonds, 2 of spades",
+                "Set: 5 of diamonds, 5 of hearts, 5 of spades",
+                "Run: 2 of clubs, 3 of clubs, 4 of clubs",
+            ]
+        )
+        XCTAssertEqual(
+            richer.computerMelds,
+            ["Set: 7 of diamonds, 7 of hearts, 7 of spades"]
+        )
+    }
+
     func testBadSeedTextKeepsTheCurrentDeal() {
         let current = DealScene.load(seed: 4)
         let (kept, error) = DealScene.load(seedText: "nope", keeping: current)
