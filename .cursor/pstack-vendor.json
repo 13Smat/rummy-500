@@ -1,0 +1,9 @@
+{
+  "name": "pstack",
+  "version": "0.15.36",
+  "commit": "08547969e1dffaa6457ea65141cc62c1d9a2eef1",
+  "source": "https://github.com/backnotprop/pstack",
+  "license": "MIT",
+  "licenseFile": ".cursor/skills/pstack-LICENSE",
+  "vendoredOn": "2026-11-10"
+}

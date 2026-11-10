@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Engine tests
+    # ubuntu-latest is Ubuntu 26.04. This job installs the Ubuntu 24.04 Swift 6.4.2 toolchain.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+      - name: Install Swift
+        run: ./scripts/install-swift-linux.sh
+      - name: Run engine tests and repo checks
+        run: ./scripts/check.sh
+
+  app:
+    name: iOS simulator
+    runs-on: macos-26
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+      - name: Install XcodeGen
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip
+          unzip -q /tmp/xcodegen.zip -d /tmp/xcodegen-dist
+          sudo /tmp/xcodegen-dist/xcodegen/install.sh /usr/local
+          xcodegen --version
+      - name: Generate the project, build the app, and run tests
+        run: ./scripts/ios-ci.sh

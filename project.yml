@@ -1,0 +1,64 @@
+name: Rummy500
+options:
+  bundleIdPrefix: com.13smat
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGNING_REQUIRED: "NO"
+    SUPPORTS_MACCATALYST: "NO"
+packages:
+  RummyEngine:
+    path: Packages/RummyEngine
+targets:
+  Rummy500:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/Rummy500
+    dependencies:
+      - package: RummyEngine
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.13smat.rummy500
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        GENERATE_INFOPLIST_FILE: "YES"
+        INFOPLIST_KEY_CFBundleDisplayName: Rummy 500
+        INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        ENABLE_TESTABILITY: "YES"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    scheme:
+      testTargets:
+        - Rummy500Tests
+  Rummy500Tests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: App/Rummy500Tests
+    dependencies:
+      - target: Rummy500
+      - package: RummyEngine
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.13smat.rummy500.tests
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Rummy500.app/Rummy500"
+        BUNDLE_LOADER: "$(TEST_HOST)"
