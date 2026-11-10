@@ -152,8 +152,9 @@ struct TableScreen: View {
                         meldCard(entry, in: meld)
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 4)
             }
+            .frame(height: TableChrome.cardHeight + 28)
         }
     }
 
@@ -206,9 +207,9 @@ struct TableScreen: View {
                             CardFace(card: card)
                         }
                     }
-                    .padding(.vertical, 2)
                     .padding(.trailing, 2)
                 }
+                .frame(height: TableChrome.cardHeight)
                 .accessibilityIdentifier("discard")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -230,8 +231,8 @@ struct TableScreen: View {
                             )
                     }
                 }
-                .padding(.vertical, 2)
             }
+            .frame(height: TableChrome.cardHeight)
             .accessibilityIdentifier("your-hand")
         }
     }
