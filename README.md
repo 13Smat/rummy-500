@@ -1,6 +1,6 @@
 # Rummy 500
 
-This is a two-player Rummy 500 demo for iPhone. You play against the computer. This branch is the shell and the rules-engine skeleton. It does not deal cards yet.
+This is a two-player Rummy 500 demo for iPhone. You play against the computer. A debug build deals a seeded hand and lists both hands, the stock count, and the discard. Melds, turns, and scoring are later tickets.
 
 ## Run the app on a Mac
 
@@ -13,7 +13,7 @@ You need Xcode 26 and XcodeGen 2.46.0.
 5. Choose the Rummy500 scheme and an iPhone simulator.
 6. Press Run.
 
-The launch screen shows Rummy 500. The first screen shows Rummy 500, and under it, You against the computer.
+The launch screen shows Rummy 500. The first screen shows Rummy 500, and under it, You against the computer. A debug build adds a seed and a Deal button under that line. Dealing lists your 13 cards, the computer's 13 cards, the stock count, and the face-up discard.
 
 Signing is off until a later Apple ticket. Run the app in the simulator. `project.yml` is the project file we keep. `Rummy500.xcodeproj` is generated, and git ignores it.
 
