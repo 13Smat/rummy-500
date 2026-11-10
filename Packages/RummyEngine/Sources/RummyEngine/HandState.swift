@@ -307,50 +307,7 @@ public struct HandState: Equatable, Sendable {
         melds: [Meld],
         player: Seat
     ) -> Bool {
-        if melds.contains(where: { meld in
-            if case .success = meld.layOff(card, playedBy: player) {
-                return true
-            }
-            return false
-        }) {
-            return true
-        }
-        var others = hand
-        guard let index = others.firstIndex(of: card) else {
-            return false
-        }
-        others.remove(at: index)
-        return canLayDown(card, with: others, player: player)
-    }
-
-    private static func canLayDown(_ card: Card, with others: [Card], player: Seat) -> Bool {
-        let sameRank = others.filter { $0.rank == card.rank }
-        if (2...3).contains(sameRank.count) {
-            if case .success = Meld.layDown([card] + sameRank, playedBy: player) {
-                return true
-            }
-        }
-        let sameSuit = others.filter { $0.suit == card.suit }
-        return containsRun(card, partners: sameSuit, player: player)
-    }
-
-    private static func containsRun(_ card: Card, partners: [Card], player: Seat) -> Bool {
-        func walk(_ start: Int, _ prefix: [Card]) -> Bool {
-            if prefix.count >= 2 {
-                if case .success = Meld.layDown([card] + prefix, playedBy: player) {
-                    return true
-                }
-            }
-            var index = start
-            while index < partners.count {
-                if walk(index + 1, prefix + [partners[index]]) {
-                    return true
-                }
-                index += 1
-            }
-            return false
-        }
-        return walk(0, [])
+        CardUse.play(of: card, in: hand, melds: melds, player: player) != nil
     }
 }
 

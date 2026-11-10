@@ -24,3 +24,5 @@ xcuserdata/
 Packages/*/.build/
 
 .DS_Store
+
+.audit/
