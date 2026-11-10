@@ -141,18 +141,10 @@ private func arrange(_ cards: [Card]) -> Result<MeldArrangement, MeldRejection> 
 private func arrangeRun(_ cards: [Card]) -> Result<MeldArrangement, MeldRejection> {
     let low = cards.sorted { lowPosition($0.rank) < lowPosition($1.rank) }
     let high = cards.sorted { highPosition($0.rank) < highPosition($1.rank) }
-    let reachesBothEnds =
-        Set(cards.map(\.rank)).isSuperset(of: [.ace, .two, .king])
     if isContiguous(low, position: lowPosition) {
-        if reachesBothEnds {
-            return .failure(.wrapsAround)
-        }
         return .success(MeldArrangement(kind: .run, cards: low))
     }
     if isContiguous(high, position: highPosition) {
-        if reachesBothEnds {
-            return .failure(.wrapsAround)
-        }
         return .success(MeldArrangement(kind: .run, cards: high))
     }
     if ranksWrapTheCorner(cards) {

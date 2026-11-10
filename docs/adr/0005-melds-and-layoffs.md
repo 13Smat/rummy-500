@@ -20,13 +20,15 @@ A player may lay a card on any meld already on the table, including a meld that 
 
 A set is stored clubs, diamonds, hearts, then spades. A run is stored from its low end to its high end. An ace-low run starts with the ace. An ace-high run ends with the ace.
 
+Ace through king of one suit is an ace-low run. The ace is only the low end, and the king is the high end, so the run does not turn the corner. `layDown` stores those 13 cards with the ace first. Laying an ace on a run of 2 through king builds that same run. `layOff` stores it ace-low as well. The ace is not placed after the king, and those 13 cards are not also kept as a second, ace-high meld.
+
 `MeldRejection` names the failure.
 
 - `needsThreeCards` means the group has fewer than 3 cards.
 - `fiveOfAKind` means 5 or more cards of one rank.
 - `duplicateCard` means the same card appears twice.
 - `mixedSuit` means the cards are not one rank and not one suit.
-- `wrapsAround` means the ranks turn the corner, including king, ace, 2, and a run that uses the ace at both ends.
+- `wrapsAround` means the cards join only by turning the corner, as in king, ace, 2. A run that is contiguous with the ace low, or contiguous with the ace high, is legal. Ace through king is contiguous with the ace low.
 - `notInSequence` means a same-suit group skips a rank.
 - `doesNotFit` means a layoff does not continue the meld. A wrap, a mixed suit, a duplicate, and five of a kind keep their own reasons.
 
