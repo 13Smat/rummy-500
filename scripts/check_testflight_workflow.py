@@ -152,6 +152,43 @@ need(
 )
 need(manual_signing_overrides(good_archive) == [], "detector allows automatic signing")
 
+development_profile_settings = (
+    "DEVELOPMENT_TEAM",
+    "-allowProvisioningUpdates",
+    "CODE_SIGN_STYLE=Automatic",
+    "CODE_SIGNING_ALLOWED=YES",
+    "CODE_SIGNING_REQUIRED=YES",
+    "-authenticationKeyPath",
+    "-authenticationKeyID",
+    "-authenticationKeyIssuerID",
+)
+
+
+def development_profile_request(command):
+    found = [name for name in development_profile_settings if name in command]
+    if "CODE_SIGNING_ALLOWED=NO" not in command.split():
+        found.append("missing CODE_SIGNING_ALLOWED=NO")
+    return found
+
+
+needs_device = (
+    "xcodebuild archive CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=ABCDEFGHIJ "
+    "CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES -allowProvisioningUpdates "
+    "-authenticationKeyPath /tmp/AuthKey.p8"
+)
+unsigned_archive = (
+    "xcodebuild archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO "
+    "CURRENT_PROJECT_VERSION=2"
+)
+need(
+    development_profile_request(needs_device) != [],
+    "detector sees a development profile request",
+)
+need(
+    development_profile_request(unsigned_archive) == [],
+    "detector allows an unsigned archive",
+)
+
 xcode_commands = [
     line for line in logical_lines(upload) if line.startswith("xcodebuild ")
 ]
@@ -162,6 +199,11 @@ need(len(archive_commands) == 1, "one archive command")
 archive_command = archive_commands[0] if archive_commands else ""
 for name in manual_signing_overrides(archive_command):
     need(False, f"archive command does not pass {name}")
+profile_request = development_profile_request(archive_command)
+need(
+    not profile_request,
+    "archive command does not need a development profile: " + ", ".join(profile_request),
+)
 for name in (
     "-allowProvisioningUpdates",
     "-authenticationKeyPath",
