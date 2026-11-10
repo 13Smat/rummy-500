@@ -1,3 +1,4 @@
+import RummyEngine
 import SwiftUI
 
 struct TableScreen: View {
