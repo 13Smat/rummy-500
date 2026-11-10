@@ -63,7 +63,6 @@ PY
 
 xcodebuild -version
 xcodegen generate
-python3 scripts/clear_manual_identity.py Rummy500.xcodeproj/project.pbxproj
 
 archive_path="$RUNNER_TEMP/Rummy500.xcarchive"
 rm -rf "$archive_path"
@@ -75,14 +74,8 @@ xcodebuild archive \
   -destination "generic/platform=iOS" \
   -archivePath "$archive_path" \
   -derivedDataPath "$RUNNER_TEMP/Rummy500-signed-derived" \
-  -allowProvisioningUpdates \
-  -authenticationKeyPath "$ASC_KEY_PATH" \
-  -authenticationKeyID "$ASC_KEY_ID" \
-  -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-  CODE_SIGN_STYLE=Automatic \
-  DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-  CODE_SIGNING_ALLOWED=YES \
-  CODE_SIGNING_REQUIRED=YES \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
   CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
 
 app="$archive_path/Products/Applications/Rummy500.app"
@@ -93,7 +86,7 @@ build=$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")
 test "$compliance" = "false"
 test "$version" = "0.1.0"
 test "$build" = "$GITHUB_RUN_NUMBER"
-echo "Signed Release archive marketing version $version build $build"
+echo "Unsigned Release archive marketing version $version build $build"
 echo "ITSAppUsesNonExemptEncryption=$compliance"
 
 xcodebuild -exportArchive \
