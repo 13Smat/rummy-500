@@ -28,7 +28,7 @@ The workflow stops before it writes the key if any name is missing. The log name
 
 A tag whose name starts with `tf-` runs the same upload. A push to `main` does not. A pull request does not.
 
-The job uses the `macos-26` runner and Xcode 26.6, the same as the simulator job. It installs XcodeGen 2.46.0, generates the Xcode project, archives the Release configuration, and uploads that archive to App Store Connect. Signing is automatic. The team comes from `APPLE_TEAM_ID`. The API key has the Admin role, so Xcode can create the distribution certificate and the profile on this run. The key file is mode 0600 in the runner temp directory. A last step deletes that file and the export options, including when a later step fails.
+The job uses the `macos-26` runner and Xcode 26.6, the same as the simulator job. It installs XcodeGen 2.46.0, generates the Xcode project, archives the Release configuration, and uploads that archive to App Store Connect. Signing is automatic. The team comes from `APPLE_TEAM_ID`. The archive command does not set a signing identity or a provisioning profile. `project.yml` still has the `-` identity so every other build stays unsigned. The upload script removes that identity from the generated project before the archive. The export plist uses method `app-store-connect`, signing style automatic, destination upload, and the team id. The API key has the Admin role, so Xcode can create the distribution certificate and the profile on this run. The key file is mode 0600 in the runner temp directory. A last step deletes that file and the export options, including when a later step fails.
 
 Uploads wait for each other. A second run does not cancel the first, and it does not create the certificate at the same time.
 
@@ -58,4 +58,5 @@ Run the workflow and turn on "Archive a Release build without signing or uploadi
 - The build number was already uploaded. Run the workflow again. The next run number is a new build.
 - A secret is incomplete. The failing step names `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, or `APPLE_TEAM_ID`. Put the whole `.p8` file in `ASC_KEY_P8`.
 - Export compliance is still waiting. The generated Info.plist sets `ITSAppUsesNonExemptEncryption` to NO, so this demo does not stop on that prompt.
+- Xcode reports conflicting provisioning settings. The archive command must not pass a signing identity or a provisioning profile. `./scripts/check.sh` fails when the archive command passes either one.
 - The upload went to an external group. Use Internal Testing for this build.
