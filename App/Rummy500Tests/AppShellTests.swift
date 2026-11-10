@@ -39,4 +39,31 @@ final class AppShellTests: XCTestCase {
         XCTAssertNil(ok)
         XCTAssertEqual(next, DealScene.load(seed: 8))
     }
+
+    func testSampleScoreShowsTheHandAndTheMatch() {
+        let opening = ScoreScene.opening
+        XCTAssertEqual(opening.match.you, 0)
+        XCTAssertEqual(opening.match.computer, 0)
+        XCTAssertEqual(opening.statusLine, "Playing")
+        XCTAssertNil(opening.lastScore)
+        XCTAssertTrue(opening.hasAnotherHand)
+
+        let first = opening.scoringNextHand()
+        XCTAssertEqual(first.lastScore?.you, 20)
+        XCTAssertEqual(first.lastScore?.computer, -15)
+        XCTAssertEqual(first.match.you, 20)
+        XCTAssertEqual(first.match.computer, -15)
+        XCTAssertEqual(first.statusLine, "Playing")
+        XCTAssertTrue(first.hasAnotherHand)
+
+        let second = first.scoringNextHand()
+        XCTAssertEqual(second.lastScore?.you, 10)
+        XCTAssertEqual(second.lastScore?.computer, -10)
+        XCTAssertEqual(second.match.you, 30)
+        XCTAssertEqual(second.match.computer, -25)
+        XCTAssertEqual(second.match.hands.count, 2)
+        XCTAssertEqual(second.statusLine, "Playing")
+        XCTAssertFalse(second.hasAnotherHand)
+        XCTAssertEqual(second.scoringNextHand(), second)
+    }
 }

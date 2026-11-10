@@ -36,6 +36,8 @@ struct DealDebugView: View {
                 Text("Discard")
                     .font(.headline)
                 cardList(scene.discard)
+                ScoreDebugView()
+                    .padding(.top, 12)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
