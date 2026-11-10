@@ -42,3 +42,10 @@ jobs:
           xcodegen --version
       - name: Generate the project, build the app, and run tests
         run: ./scripts/ios-ci.sh
+      - name: Upload table screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: table-screenshots
+          path: build/table-screenshots/*.png
+          if-no-files-found: ignore
