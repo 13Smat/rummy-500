@@ -166,4 +166,26 @@ final class AppShellTests: XCTestCase {
         XCTAssertGreaterThan(finished.handsPlayed, 0)
         XCTAssertEqual(ComputerScene.load(seed: 0).autoplaying(), finished)
     }
+
+    func testTableScreenLoadsEachPreset() {
+        let fresh = TableScene.load(.freshDeal)
+        let mid = TableScene.load(.midHand)
+        let long = TableScene.load(.longDiscard)
+
+        XCTAssertEqual(fresh.yourHand.count, 13)
+        XCTAssertTrue(fresh.melds.isEmpty)
+        XCTAssertEqual(fresh.turnLabel, "Your turn")
+        XCTAssertGreaterThanOrEqual(mid.melds.count, 2)
+        XCTAssertEqual(mid.turnLabel, "Computer's turn")
+        XCTAssertGreaterThan(long.yourHand.count, 13)
+        XCTAssertGreaterThanOrEqual(long.discard.count, 8)
+        XCTAssertEqual(long.turnLabel, "Your turn")
+        XCTAssertEqual(
+            [fresh.preset, mid.preset, long.preset],
+            [TablePreset.freshDeal, .midHand, .longDiscard]
+        )
+        _ = TableScreen(preset: .freshDeal)
+        _ = TableScreen(preset: .midHand)
+        _ = TableScreen(preset: .longDiscard)
+    }
 }
