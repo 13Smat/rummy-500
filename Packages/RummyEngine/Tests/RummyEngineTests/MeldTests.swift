@@ -120,9 +120,30 @@ final class MeldTests: XCTestCase {
         )
     }
 
-    func testWholeSuitWraps() {
+    func testWholeSuitIsAnAceLowRun() throws {
         let suit = Rank.allCases.map { card($0, .clubs) }
-        XCTAssertEqual(Meld.layDown(suit, playedBy: .you), .failure(.wrapsAround))
+        let meld = try Meld.layDown(suit.reversed(), playedBy: .you).get()
+        XCTAssertEqual(meld.kind, .run)
+        XCTAssertEqual(meld.cards, suit)
+    }
+
+    func testAceLaysOffLowOnTwoThroughKing() throws {
+        let hearts = Rank.allCases.map { card($0, .hearts) }
+        let twoThroughKing = Array(hearts.dropFirst())
+        let run = try Meld.layDown(twoThroughKing, playedBy: .computer).get()
+        let withAce = try run.layOff(card(.ace, .hearts), playedBy: .you).get()
+        XCTAssertEqual(withAce.cards, hearts)
+        XCTAssertEqual(withAce.played.first, played(.ace, .hearts, .you))
+        XCTAssertEqual(withAce.cards(playedBy: .computer), twoThroughKing)
+    }
+
+    func testAceOnTwoThroughKingIsStoredLowRatherThanHigh() throws {
+        let spades = Rank.allCases.map { card($0, .spades) }
+        let twoThroughKing = Array(spades.dropFirst())
+        let run = try Meld.layDown(twoThroughKing, playedBy: .you).get()
+        let withAce = try run.layOff(card(.ace, .spades), playedBy: .you).get()
+        XCTAssertEqual(withAce.cards, spades)
+        XCTAssertEqual(withAce.cards.last, card(.king, .spades))
     }
 
     func testMixedSuitRunIsRejected() {
