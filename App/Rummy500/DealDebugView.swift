@@ -29,9 +29,23 @@ struct DealDebugView: View {
                 Text("Your hand")
                     .font(.headline)
                 cardList(scene.yourHand)
+                Text("Largest legal melds")
+                    .font(.headline)
+                if scene.yourMelds.isEmpty {
+                    Text("None")
+                } else {
+                    cardList(scene.yourMelds)
+                }
                 Text("Computer hand")
                     .font(.headline)
                 cardList(scene.computerHand)
+                Text("Largest legal melds")
+                    .font(.headline)
+                if scene.computerMelds.isEmpty {
+                    Text("None")
+                } else {
+                    cardList(scene.computerMelds)
+                }
                 Text("Stock: \(scene.stockCount)")
                 Text("Discard")
                     .font(.headline)
