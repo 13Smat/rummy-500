@@ -1,0 +1,30 @@
+# Secrets and signing. The Apple ticket adds a team later.
+.env
+.env.*
+*.pem
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.certSigningRequest
+*.key
+secrets/
+*.xcconfig.local
+
+# Generated Xcode project. project.yml is the source. See docs/adr/0002-generate-the-xcode-project.md
+Rummy500.xcodeproj/
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Swift package build
+.build/
+.swiftpm/
+.swiftpm
+Packages/*/.build/
+
+# OS
+.DS_Store
