@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- The TestFlight archive signs automatically and does not pass a signing identity. A distribution identity on that command conflicted with the app target and with the RummyEngine package.
+- The TestFlight archive is unsigned. Export signs it for App Store distribution, so the upload does not need a registered device.
+- The TestFlight archive command does not pass a signing identity. A distribution identity on that command conflicted with the app target and with the RummyEngine package.
 - On the table you can draw, take a discard, lay down, lay off, and discard. A refusal explains the move in plain words and leaves the hand as it was. The computer plays its turn one move at a time. When the hand ends, deal the next one and the score stays.
 - A TestFlight workflow uploads a signed Release build. The marketing version is 0.1.0. The build number is the Actions run number. The app answers export compliance as no. The icon is still a placeholder.
 - The iPhone table shows your hand face up, the computer's hand face down, the stock, every discard, both players' melds, the match scores, and whose turn it is. A menu loads a fresh deal, a mid-hand with layoffs, or a long discard pile. Debug lists stay behind a Debug button.

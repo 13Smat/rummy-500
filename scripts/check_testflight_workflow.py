@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import subprocess
 import sys
 from pathlib import Path
 
@@ -98,9 +97,8 @@ for needle in (
     "-authenticationKeyIssuerID",
     "app-store-connect",
     "CURRENT_PROJECT_VERSION",
-    "CODE_SIGN_STYLE=Automatic",
     "-exportArchive",
-    "CODE_SIGNING_ALLOWED=YES",
+    "CODE_SIGNING_ALLOWED=NO",
 ):
     need(needle in upload, f"upload script has {needle}")
 need("fastlane" not in upload.lower(), "upload does not call fastlane")
@@ -152,6 +150,43 @@ need(
 )
 need(manual_signing_overrides(good_archive) == [], "detector allows automatic signing")
 
+development_profile_settings = (
+    "DEVELOPMENT_TEAM",
+    "-allowProvisioningUpdates",
+    "CODE_SIGN_STYLE=Automatic",
+    "CODE_SIGNING_ALLOWED=YES",
+    "CODE_SIGNING_REQUIRED=YES",
+    "-authenticationKeyPath",
+    "-authenticationKeyID",
+    "-authenticationKeyIssuerID",
+)
+
+
+def development_profile_request(command):
+    found = [name for name in development_profile_settings if name in command]
+    if "CODE_SIGNING_ALLOWED=NO" not in command.split():
+        found.append("missing CODE_SIGNING_ALLOWED=NO")
+    return found
+
+
+needs_device = (
+    "xcodebuild archive CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=ABCDEFGHIJ "
+    "CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES -allowProvisioningUpdates "
+    "-authenticationKeyPath /tmp/AuthKey.p8"
+)
+unsigned_archive = (
+    "xcodebuild archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO "
+    "CURRENT_PROJECT_VERSION=2"
+)
+need(
+    development_profile_request(needs_device) != [],
+    "detector sees a development profile request",
+)
+need(
+    development_profile_request(unsigned_archive) == [],
+    "detector allows an unsigned archive",
+)
+
 xcode_commands = [
     line for line in logical_lines(upload) if line.startswith("xcodebuild ")
 ]
@@ -162,15 +197,14 @@ need(len(archive_commands) == 1, "one archive command")
 archive_command = archive_commands[0] if archive_commands else ""
 for name in manual_signing_overrides(archive_command):
     need(False, f"archive command does not pass {name}")
+profile_request = development_profile_request(archive_command)
+need(
+    not profile_request,
+    "archive command does not need a development profile: " + ", ".join(profile_request),
+)
 for name in (
-    "-allowProvisioningUpdates",
-    "-authenticationKeyPath",
-    "-authenticationKeyID",
-    "-authenticationKeyIssuerID",
-    "CODE_SIGN_STYLE=Automatic",
-    "DEVELOPMENT_TEAM=",
-    "CODE_SIGNING_ALLOWED=YES",
-    "CODE_SIGNING_REQUIRED=YES",
+    "CODE_SIGNING_ALLOWED=NO",
+    "CODE_SIGNING_REQUIRED=NO",
     "CURRENT_PROJECT_VERSION=",
 ):
     need(name in archive_command, f"archive command has {name}")
@@ -182,6 +216,13 @@ need(len(export_commands) == 1, "one export command")
 export_command = export_commands[0] if export_commands else ""
 for name in manual_signing_overrides(export_command):
     need(False, f"export command does not pass {name}")
+for name in (
+    "-allowProvisioningUpdates",
+    "-authenticationKeyPath",
+    "-authenticationKeyID",
+    "-authenticationKeyIssuerID",
+):
+    need(name in export_command, f"export command has {name}")
 need("signingCertificate" not in upload, "export plist does not pin a certificate")
 need("provisioningProfiles" not in upload, "export plist does not pin a profile")
 need("<key>signingStyle</key>" in upload, "export signing style key")
@@ -190,28 +231,6 @@ need("<key>destination</key>" in upload, "export destination key")
 need("<string>upload</string>" in upload, "export destination upload")
 need("<key>teamID</key>" in upload, "export team id")
 need("<string>app-store-connect</string>" in upload, "export method app-store-connect")
-clear_at = upload.find("python3 scripts/clear_manual_identity.py ")
-archive_at = upload.find("xcodebuild archive")
-need(
-    clear_at != -1 and archive_at != -1 and clear_at < archive_at,
-    "clear the generated identity before archive",
-)
-need(
-    "Rummy500.xcodeproj/project.pbxproj" in upload[clear_at:archive_at]
-    if clear_at != -1 and archive_at != -1
-    else False,
-    "clear runs on the generated project",
-)
-clear_script = root / "scripts" / "clear_manual_identity.py"
-completed = subprocess.run(
-    [sys.executable, str(clear_script), "--self-test"],
-    text=True,
-    capture_output=True,
-    check=False,
-)
-if completed.returncode != 0:
-    detail = (completed.stdout + completed.stderr).strip()
-    need(False, "clear manual identity self-test: " + detail)
 
 for needle in (
     "CODE_SIGNING_ALLOWED=NO",
