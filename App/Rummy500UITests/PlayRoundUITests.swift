@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 final class PlayRoundUITests: XCTestCase {
     func testASeededHandPlaysOneRound() {
         let app = XCUIApplication()

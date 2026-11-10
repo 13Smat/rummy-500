@@ -46,7 +46,7 @@ final class TableSessionTests: XCTestCase {
         XCTAssertGreaterThan(discarded.beat, 0)
     }
 
-    func testDeeperDiscardPickTakesTheCardsAboveIt() {
+    func testDeeperDiscardPickTakesTheCardsAboveIt() throws {
         let buried = Card(rank: .three, suit: .diamonds)
         let before = TableSession(
             hand: TablePresets.handBeforeLongPick(),
