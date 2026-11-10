@@ -1,0 +1,41 @@
+# Upload TestFlight builds from GitHub Actions
+
+## Status
+
+Accepted
+
+## Context
+
+Andy needs a build on his iPhone without opening Xcode. App Store Connect already has the app `com.13smat.rummy500`. The simulator job, and `scripts/check_project_yml.py`, keep `CODE_SIGNING_ALLOWED` at NO and refuse a `DEVELOPMENT_TEAM` in `project.yml`. Signing has to turn on for one archive and stay off for every other build.
+
+The values that can sign that archive are GitHub Actions secrets. The names are `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, and `APPLE_TEAM_ID`. The API key has the Admin role.
+
+## Decision
+
+`.github/workflows/testflight.yml` runs when someone starts it by hand, or when someone pushes a tag that starts with `tf-`. A push to `main` does not run it. A pull request does not run it.
+
+The job writes the `.p8` into the runner temp directory as mode 0600. It generates the Xcode project with XcodeGen 2.46.0. It archives the Release configuration for a generic iOS device. That command sets automatic signing. The identity is Apple Distribution, which replaces the `-` identity in `project.yml`. The team secret is passed as `DEVELOPMENT_TEAM`. `github.run_number` is passed as `CURRENT_PROJECT_VERSION`. The marketing version stays `MARKETING_VERSION` in `project.yml`, which starts at 0.1.0.
+
+`xcodebuild -exportArchive` reads an export plist whose method is `app-store-connect` and whose destination is `upload`. The same API key is passed as `-authenticationKeyPath`, `-authenticationKeyID`, and `-authenticationKeyIssuerID`, with `-allowProvisioningUpdates`. Xcode creates the distribution certificate and the profile. Fastlane match is not used. Match would keep a second copy of the certificate in another repo, and this key can already create the certificate.
+
+A last step always deletes the key file and the export plist.
+
+The generated Info.plist sets `ITSAppUsesNonExemptEncryption` to NO. The app makes no network call. The 1024 by 1024 icon already in the catalog has no transparency. It is a flat green placeholder. The real icon is a later ticket.
+
+Pull requests also build an unsigned Release archive with `scripts/archive-unsigned-release.sh`. The workflow's dry-run input runs that same script. The archive check requires marketing version 0.1.0 and the encryption answer. Linux checks the secret script, the key-file mode, the icon, and the workflow triggers. Those checks do not need the secrets.
+
+Uploads share one concurrency group and do not cancel a run that is already signing. Two runs cannot create the certificate at the same time. A later run still gets its own build number.
+
+## Consequences
+
+The first green upload can create a distribution certificate on the Apple team. The project file still has signing off, so the simulator job does not need the secrets. Someone has to add the four secrets before an upload works. The job names a missing secret and does not print the value.
+
+`docs/adr/0001-native-swift-and-a-pure-engine.md` left signing and the bundle id for a later ticket. This decision settles that wait. The bundle id is `com.13smat.rummy500`, which App Store Connect already uses.
+
+## Alternatives
+
+Turning signing on in `project.yml` would make a local build and the simulator job look for a team. The project check forbids that.
+
+Uploading on every push to `main` would spend a Mac runner and a build number on each merge. The upload stays a manual action.
+
+Fastlane match would add a certificate repo. The Admin API key and `-allowProvisioningUpdates` already cover cloud-managed signing, so a second tool is not part of this path.

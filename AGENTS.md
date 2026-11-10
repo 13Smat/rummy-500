@@ -59,7 +59,7 @@ Run the Rummy500 scheme on an iPhone simulator. The screen shows the name Rummy 
 
 ### CI
 
-`.github/workflows/ci.yml` runs on every pull request. The engine job uses `ubuntu-24.04` and `scripts/install-swift-linux.sh`, which installs the official Swift 6.4.2 toolchain for that release, then runs `./scripts/check.sh`. `ubuntu-latest` is Ubuntu 26.04, and `swift-actions/setup-swift` 2.4.0 neither accepts that release nor lists Swift 6.4.2. The macOS job uses the `macos-26` runner and Xcode 26.6. It installs XcodeGen 2.46.0, generates the project, builds the app for an iPhone simulator, and runs the app tests. Signing stays off until a later Apple ticket. The workflow does not use a larger macOS runner.
+`.github/workflows/ci.yml` runs on every pull request. The engine job uses `ubuntu-24.04` and `scripts/install-swift-linux.sh`, which installs the official Swift 6.4.2 toolchain for that release, then runs `./scripts/check.sh`. `ubuntu-latest` is Ubuntu 26.04, and `swift-actions/setup-swift` 2.4.0 neither accepts that release nor lists Swift 6.4.2. The macOS job uses the `macos-26` runner and Xcode 26.6. It installs XcodeGen 2.46.0, generates the project, builds the app for an iPhone simulator, and runs the app tests. Signing stays off for that job. `.github/workflows/testflight.yml` signs a Release archive and uploads it to TestFlight when the App Store Connect secrets are set. The workflows do not use a larger macOS runner.
 
 ### Engine boundary
 

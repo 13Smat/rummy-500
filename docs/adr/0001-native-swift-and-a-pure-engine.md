@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. `docs/adr/0010-testflight-from-actions.md` supersedes the signing wait and the placeholder bundle id.
 
 ## Context
 
