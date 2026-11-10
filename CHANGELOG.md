@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added hand scoring and a match total to 500 in `RummyEngine`. A debug build can score a scripted hand and show the totals.
 - Added cards, a 52-card deck, and a seeded two-player deal in `RummyEngine`.
 - A debug build can open that deal by seed and show both hands, the stock count, and the discard.
 
