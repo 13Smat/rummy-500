@@ -45,7 +45,7 @@ def main() -> int:
             name = attachment.get("suggestedHumanReadableName") or ""
             if not name.endswith(".png"):
                 continue
-            if not name.startswith(("fresh-deal", "mid-hand", "long-discard")):
+            if not name.startswith(("fresh-deal", "mid-hand", "long-discard", "play-")):
                 continue
             source = staging / attachment["exportedFileName"]
             target = output / name

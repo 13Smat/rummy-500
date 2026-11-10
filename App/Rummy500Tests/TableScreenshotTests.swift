@@ -1,3 +1,4 @@
+import RummyEngine
 import SwiftUI
 import UIKit
 import XCTest
@@ -10,6 +11,27 @@ final class TableScreenshotTests: XCTestCase {
     }
 
     @MainActor
+    func testRenderPlayStates() {
+        let size = CGSize(width: 375, height: 667)
+        let buried = Card(rank: .three, suit: .diamonds)
+        let before = TableSession(
+            hand: TablePresets.handBeforeLongPick(),
+            match: TablePresets.match(.longDiscard),
+            playsLive: false,
+            menuPreset: .longDiscard
+        )
+        let picked = before.takeDiscard(buried)
+        render(TablePage(session: picked), name: "play-deeper-pick", size: size)
+        let other = picked.order.first { $0 != buried }
+        let blocked = picked.selecting(other.map { [$0] } ?? []).discardSelection()
+        render(TablePage(session: blocked), name: "play-must-use", size: size)
+        let refused = TableSession.opening(seed: 0, playsLive: false).layDownSelection()
+        render(TablePage(session: refused), name: "play-refused", size: size)
+        let computer = TableSession(preset: .midHand, playsLive: false).stepComputer()
+        render(TablePage(session: computer), name: "play-computer", size: size)
+    }
+
+    @MainActor
     private func renderEachPreset() {
         let phones = [
             Phone(name: "iphone-se", width: 375, height: 667),
@@ -17,7 +39,7 @@ final class TableScreenshotTests: XCTestCase {
         ]
         for preset in TablePreset.allCases {
             for phone in phones {
-                let page = TablePage(preset: preset)
+                let page = TablePage(preset: preset, playsLive: false)
                     .frame(width: phone.width, height: phone.height)
                 guard let image = snapshot(page, size: CGSize(width: phone.width, height: phone.height)),
                       let data = image.pngData() else {
@@ -43,6 +65,20 @@ final class TableScreenshotTests: XCTestCase {
                 add(attachment)
             }
         }
+    }
+
+    @MainActor
+    private func render<Content: View>(_ content: Content, name: String, size: CGSize) {
+        guard let image = snapshot(content.frame(width: size.width, height: size.height), size: size),
+              let data = image.pngData() else {
+            XCTFail("Could not render \(name)")
+            return
+        }
+        XCTAssertGreaterThan(PixelCount(image).cardFace, 20_000, "\(name) did not draw the card faces")
+        let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
+        attachment.name = "\(name).png"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     @MainActor

@@ -14,4 +14,5 @@ enum TableChrome {
     static let blackSuit = Color(red: 0.12, green: 0.12, blue: 0.14)
     static let chip = Color(red: 0.97, green: 0.96, blue: 0.93)
     static let chipInk = Color(red: 0.10, green: 0.16, blue: 0.14)
+    static let owed = Color(red: 0.20, green: 0.85, blue: 0.72)
 }
