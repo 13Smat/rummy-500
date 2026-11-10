@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A turn in `RummyEngine` is a draw, then melds and layoffs, then one discard. The draw is the top of the stock, or a discard plus every card above it. The chosen discard has to be melded or laid off before any other move. Going out, including by discarding the last card, ends the hand. An empty stock ends the hand when the player does not take a usable discard. The score still comes from `HandResult`.
+- A debug build steps through a scripted hand and shows the stock, the spread discard, both hands, the table, whose turn it is, and the score.
+- Agents run /setup-pstack only when `.cursor/rules/pstack-models.mdc` is missing. A rerun waits until Andy asks for a new budget or a new model.
 - Told agents to run /setup-pstack first, before any other pstack skill.
 - Added `Meld` in `RummyEngine`. A set of 3 or 4 and a suited run of 3 or more can be laid down. Ace-low and ace-high runs are legal. Ace through king of one suit is an ace-low run. King, ace, 2, a mixed suit, and five of a kind are rejected.
 - A layoff can extend a set or a run, including a meld played by the other seat. Each card keeps the seat that played it.

@@ -1,0 +1,58 @@
+---
+title: "A Rummy 500 turn"
+---
+stateDiagram-v2
+  state "Legend" as legend {
+    lg0: Draw
+    lg1: Picked card
+    lg2: Meld or discard
+    lg3: Hand over
+  }
+  class lg0 blue
+  class lg1 orange
+  class lg2 teal
+  class lg3 purple
+  s0: Your turn to draw
+  s1: You must play the card just picked
+  s2: You can meld, then discard
+  s3: Computer's turn, and the stock is empty
+  s4: You went out
+  s5: You can meld, or discard your last card
+  s6: The hand ends with the stock empty
+  s7: Computer must play the card just picked
+  s8: Computer went out
+  s9: Computer can meld, or discard the last card
+  s10: Computer can meld, then discard
+  s11: Your turn, and the stock is empty
+  [*] --> s0
+  s0 --> s1: you take the top discard
+  s0 --> s2: you draw from the stock
+  s1 --> s4: you meld the rest of the hand
+  s1 --> s5: you play the picked card and one card is left
+  s2 --> s3: you discard
+  s2 --> s4: you meld the rest of the hand
+  s2 --> s5: you meld a card
+  s3 --> s6: the computer leaves the discard pile
+  s3 --> s7: the computer takes the top discard or the computer takes a buried discard and the cards above it
+  s5 --> s4: you meld the rest of the hand or you discard your last card
+  s7 --> s8: the computer melds the rest of the hand
+  s7 --> s9: the computer plays the picked card and one card is left
+  s7 --> s10: the computer plays the picked card and keeps the others
+  s9 --> s8: the computer melds the rest of the hand or the computer discards the last card
+  s10 --> s8: the computer melds the rest of the hand
+  s10 --> s11: the computer discards
+  s10 --> s9: the computer melds a card
+  s11 --> s6: you leave the discard pile
+  s11 --> s1: you take the top discard
+  class s0 blue
+  class s1 orange
+  class s2 teal
+  class s3 blue
+  class s4 purple
+  class s5 teal
+  class s6 purple
+  class s7 orange
+  class s8 purple
+  class s9 teal
+  class s10 teal
+  class s11 blue

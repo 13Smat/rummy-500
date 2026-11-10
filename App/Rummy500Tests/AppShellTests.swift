@@ -88,4 +88,49 @@ final class AppShellTests: XCTestCase {
         XCTAssertFalse(second.hasAnotherHand)
         XCTAssertEqual(second.scoringNextHand(), second)
     }
+
+    func testScriptedHandStepsThroughADeepPickAndScores() {
+        var scene = TurnScene.opening
+        XCTAssertEqual(scene.stockCount, 2)
+        XCTAssertEqual(scene.discard, ["3 of hearts", "5 of diamonds", "9 of clubs"])
+        XCTAssertEqual(scene.yourHand.first, "7 of hearts")
+        XCTAssertEqual(scene.yourHand.count, 5)
+        XCTAssertEqual(scene.computerHand.count, 4)
+        XCTAssertEqual(scene.melds, [])
+        XCTAssertEqual(scene.status, "Your turn to draw")
+        XCTAssertNil(scene.yourScore)
+        XCTAssertTrue(scene.hasAnotherStep)
+
+        var sawDeepPick = false
+        var sawComputerDraw = false
+        while scene.hasAnotherStep {
+            let discardCount = scene.discard.count
+            scene = scene.steppingForward()
+            if discardCount - scene.discard.count > 1 {
+                sawDeepPick = true
+                XCTAssertEqual(scene.status, "You must play the 3 of hearts")
+                XCTAssertEqual(scene.discard, [])
+                XCTAssertTrue(scene.yourHand.contains("5 of diamonds"))
+                XCTAssertTrue(scene.yourHand.contains("9 of clubs"))
+                XCTAssertTrue(scene.yourHand.contains("4 of clubs"))
+                XCTAssertTrue(scene.yourHand.contains("6 of spades"))
+                XCTAssertTrue(scene.yourHand.contains("3 of hearts"))
+            }
+            if scene.status == "Computer's turn to draw" {
+                sawComputerDraw = true
+            }
+        }
+
+        XCTAssertTrue(sawDeepPick)
+        XCTAssertTrue(sawComputerDraw)
+        XCTAssertEqual(scene.status, "The stock is empty")
+        XCTAssertEqual(scene.stockCount, 0)
+        XCTAssertEqual(scene.yourScore, 8)
+        XCTAssertEqual(scene.computerScore, -1)
+        XCTAssertEqual(scene.yourMatchTotal, 8)
+        XCTAssertEqual(scene.computerMatchTotal, -1)
+        XCTAssertTrue(scene.melds.contains { $0.contains("3 of hearts (You)") })
+        XCTAssertFalse(scene.hasAnotherStep)
+        XCTAssertEqual(scene.steppingForward(), scene)
+    }
 }
