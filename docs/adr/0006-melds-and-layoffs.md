@@ -8,7 +8,7 @@ Accepted
 
 The rules sheet allows a set of 3 or 4 cards of one rank, and a run of 3 or more cards of one suit. An ace may be low, as in ace, 2, 3, or high, as in queen, king, ace. A run may not turn the corner. King, ace, 2 is not a run. The demo uses one deck, so five of a kind cannot occur. There are no jokers.
 
-A player may lay a card on any meld already on the table, including a meld that belongs to the other player. The card stays credited to the player who played it. Scoring, in a later ticket, reads the cards each player has on the table and the cards still in each hand. It does not need turn order.
+A player may lay a card on any meld already on the table, including a meld that belongs to the other player. The card stays credited to the player who played it. Scoring reads the cards each player has on the table and the cards still in each hand. It does not need turn order.
 
 `Card`, `Hand`, `Deal`, and `Seat` already exist. This change uses them and does not redefine them. The open questions in `docs/RULES.md` stay unanswered. This change does not decide when a hand ends, whether a discard that cannot be melded is refused, or how a low ace scores. An ace is worth 15 because `Rank.points` already says so. That is the point table, not a new answer to open question 3.
 
@@ -16,7 +16,7 @@ A player may lay a card on any meld already on the table, including a meld that 
 
 `Meld` is created only by `layDown(_:playedBy:)` and `layOff(_:playedBy:)`. Both return `Result<Meld, MeldRejection>`. The initializer is private, so an illegal group cannot be built.
 
-`PlayedCard` is one card and the `Seat` that played it. `Meld.played` is that list in table order. `cards(playedBy:)` returns one seat's cards from one meld. A later scoring ticket can flatten several melds with `flatMap` and can read a hand from `Hand.cards`.
+`PlayedCard` is one card and the `Seat` that played it. `Meld.played` is that list in table order. `cards(playedBy:)` returns one seat's cards from one meld. Scoring can flatten several melds with `flatMap` and can read a hand from `Hand.cards`.
 
 A set is stored clubs, diamonds, hearts, then spades. A run is stored from its low end to its high end. An ace-low run starts with the ace. An ace-high run ends with the ace.
 
