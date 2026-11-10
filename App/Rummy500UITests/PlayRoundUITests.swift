@@ -23,11 +23,14 @@ final class PlayRoundUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["phase"].label, "Meld or discard")
         app.buttons["discard-action"].tap()
 
-        waitForLabel("Computer's turn", on: turn, timeout: 5)
-        XCTAssertTrue(app.staticTexts["computer-line"].waitForExistence(timeout: 5))
-        waitForLabel("Your turn", on: turn, timeout: 30)
+        // The discard tap waits for the app to settle. The computer's pauses
+        // finish during that wait, so the turn is already back, and the line
+        // it left is the record of the turn.
+        let computer = app.staticTexts["computer-line"]
+        XCTAssertTrue(computer.waitForExistence(timeout: 8))
+        XCTAssertFalse(computer.label.isEmpty)
+        XCTAssertEqual(turn.label, "Your turn")
         XCTAssertEqual(app.staticTexts["phase"].label, "Draw a card")
-        XCTAssertTrue(app.staticTexts["computer-line"].exists)
     }
 
     func testLongDiscardShowsTheCardYouMustPlay() {
@@ -38,13 +41,5 @@ final class PlayRoundUITests: XCTestCase {
         let banner = app.staticTexts["must-use"]
         XCTAssertTrue(banner.waitForExistence(timeout: 15))
         XCTAssertEqual(banner.label, "Play the 3 of diamonds before you do anything else.")
-    }
-
-    private func waitForLabel(_ label: String, on element: XCUIElement, timeout: TimeInterval) {
-        let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "label == %@", label),
-            object: element
-        )
-        wait(for: [expectation], timeout: timeout)
     }
 }

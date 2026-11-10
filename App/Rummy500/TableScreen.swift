@@ -275,11 +275,12 @@ struct TableScreen: View {
                                 session = session.takeDiscard(card)
                             } label: {
                                 CardFace(card: card)
-                                    .accessibilityHidden(true)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityElement(children: .combine)
                             .accessibilityLabel(CardLabel.spoken(card))
                             .accessibilityIdentifier(TableCardID.discard(card))
+                            .accessibilityAddTraits(.isButton)
                         }
                     }
                     .padding(.trailing, 2)
@@ -304,12 +305,13 @@ struct TableScreen: View {
                             session = session.toggle(card)
                         } label: {
                             CardFace(card: card, mark: session.mark(for: card))
-                                .accessibilityHidden(true)
                                 .padding(.leading, extraSuitGap(scene.yourHand, index: index))
                         }
                         .buttonStyle(.plain)
+                        .accessibilityElement(children: .combine)
                         .accessibilityLabel(handLabel(card))
                         .accessibilityIdentifier(TableCardID.hand(card))
+                        .accessibilityAddTraits(.isButton)
                         .accessibilityAddTraits(session.selected.contains(card) ? .isSelected : [])
                     }
                 }
