@@ -103,6 +103,93 @@ for needle in (
 ):
     need(needle in upload, f"upload script has {needle}")
 need("fastlane" not in upload.lower(), "upload does not call fastlane")
+
+
+def logical_lines(text):
+    lines = []
+    buffer = ""
+    for raw in text.splitlines():
+        piece = raw.strip()
+        if piece.startswith("#"):
+            continue
+        buffer = f"{buffer} {piece}".strip() if buffer else piece
+        if buffer.endswith("\\"):
+            buffer = buffer[:-1].rstrip()
+            continue
+        if buffer:
+            lines.append(buffer)
+        buffer = ""
+    if buffer:
+        lines.append(buffer)
+    return lines
+
+
+def manual_signing_overrides(command):
+    found = []
+    for name in ("CODE_SIGN_IDENTITY", "PROVISIONING_PROFILE"):
+        if any(name in token for token in command.split()):
+            found.append(name)
+    return found
+
+
+bad_identity = (
+    'xcodebuild archive CODE_SIGN_STYLE=Automatic '
+    'CODE_SIGN_IDENTITY="Apple Distribution" DEVELOPMENT_TEAM=ABCDEFGHIJ'
+)
+bad_profile = "xcodebuild archive PROVISIONING_PROFILE_SPECIFIER=AppStore"
+good_archive = (
+    "xcodebuild archive CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=ABCDEFGHIJ "
+    "-allowProvisioningUpdates"
+)
+need(
+    manual_signing_overrides(bad_identity) == ["CODE_SIGN_IDENTITY"],
+    "detector sees a manual signing identity",
+)
+need(
+    manual_signing_overrides(bad_profile) == ["PROVISIONING_PROFILE"],
+    "detector sees a provisioning profile",
+)
+need(manual_signing_overrides(good_archive) == [], "detector allows automatic signing")
+
+xcode_commands = [
+    line for line in logical_lines(upload) if line.startswith("xcodebuild ")
+]
+archive_commands = [
+    line for line in xcode_commands if line.startswith("xcodebuild archive ")
+]
+need(len(archive_commands) == 1, "one archive command")
+archive_command = archive_commands[0] if archive_commands else ""
+for name in manual_signing_overrides(archive_command):
+    need(False, f"archive command does not pass {name}")
+for name in (
+    "-allowProvisioningUpdates",
+    "-authenticationKeyPath",
+    "-authenticationKeyID",
+    "-authenticationKeyIssuerID",
+    "CODE_SIGN_STYLE=Automatic",
+    "DEVELOPMENT_TEAM=",
+    "CODE_SIGNING_ALLOWED=YES",
+    "CODE_SIGNING_REQUIRED=YES",
+    "CURRENT_PROJECT_VERSION=",
+):
+    need(name in archive_command, f"archive command has {name}")
+
+export_commands = [
+    line for line in xcode_commands if line.startswith("xcodebuild -exportArchive ")
+]
+need(len(export_commands) == 1, "one export command")
+export_command = export_commands[0] if export_commands else ""
+for name in manual_signing_overrides(export_command):
+    need(False, f"export command does not pass {name}")
+need("signingCertificate" not in upload, "export plist does not pin a certificate")
+need("provisioningProfiles" not in upload, "export plist does not pin a profile")
+need("<key>signingStyle</key>" in upload, "export signing style key")
+need("<string>automatic</string>" in upload, "export signing style automatic")
+need("<key>destination</key>" in upload, "export destination key")
+need("<string>upload</string>" in upload, "export destination upload")
+need("<key>teamID</key>" in upload, "export team id")
+need("<string>app-store-connect</string>" in upload, "export method app-store-connect")
+
 for needle in (
     "CODE_SIGNING_ALLOWED=NO",
     "-configuration Release",
