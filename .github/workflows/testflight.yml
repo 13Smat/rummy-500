@@ -1,0 +1,65 @@
+name: TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Archive a Release build without signing or uploading
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "tf-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.dry_run && 'dry' || 'upload' }}
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Upload to TestFlight
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+
+      - name: Install XcodeGen
+        run: ./scripts/install-xcodegen.sh
+
+      - name: Require App Store Connect secrets
+        if: ${{ !inputs.dry_run }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: python3 scripts/check_asc_secrets.py
+
+      - name: Write the App Store Connect key
+        if: ${{ !inputs.dry_run }}
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: python3 scripts/write_asc_key.py
+
+      - name: Archive an unsigned Release build
+        if: ${{ inputs.dry_run }}
+        run: ./scripts/archive-unsigned-release.sh
+
+      - name: Archive and upload a signed Release build
+        if: ${{ !inputs.dry_run }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: ./scripts/archive-and-upload.sh
+
+      - name: Delete the App Store Connect key
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/AuthKey_ASC.p8" "${RUNNER_TEMP}/ExportOptions.plist"
