@@ -44,7 +44,6 @@ struct TableScreen: View {
         .padding(.horizontal, 10)
         .padding(.bottom, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .accessibilityIdentifier("table-screen")
         .task(id: session.beat) {
             guard session.computerPending else {
                 return
@@ -181,6 +180,7 @@ struct TableScreen: View {
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
+                .accessibilityIdentifier(identifier)
             if melds.isEmpty {
                 Text("None")
                     .font(.caption)
@@ -191,7 +191,6 @@ struct TableScreen: View {
                 }
             }
         }
-        .accessibilityIdentifier(identifier)
     }
 
     private func meldRow(_ meld: TableMeld) -> some View {
@@ -268,6 +267,7 @@ struct TableScreen: View {
                 Text("Discard \(scene.discard.count)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
+                    .accessibilityIdentifier("discard")
                 ScrollView(.horizontal) {
                     HStack(spacing: TableChrome.discardStride - TableChrome.cardWidth) {
                         ForEach(scene.discard, id: \.self) { card in
@@ -288,7 +288,6 @@ struct TableScreen: View {
                 .frame(height: TableChrome.cardHeight)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityIdentifier("discard")
         }
     }
 
@@ -297,6 +296,7 @@ struct TableScreen: View {
             Text("Your hand \(scene.yourHand.count)")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
+                .accessibilityIdentifier("your-hand")
             ScrollView(.horizontal) {
                 HStack(spacing: TableChrome.handGap) {
                     ForEach(Array(scene.yourHand.enumerated()), id: \.element) { index, card in
@@ -316,7 +316,6 @@ struct TableScreen: View {
             }
             .scrollIndicators(.hidden)
             .frame(height: TableChrome.cardHeight)
-            .accessibilityIdentifier("your-hand")
         }
     }
 
