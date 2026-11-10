@@ -1,22 +1,30 @@
 import SwiftUI
 
 struct ContentView: View {
-    private let preset: TablePreset
+    private let session: TableSession
 
-    init(preset: TablePreset = .freshDeal) {
-        self.preset = preset
+    init(session: TableSession = TableLaunch.session()) {
+        self.session = session
     }
 
     var body: some View {
         NavigationStack {
-            TablePage(preset: preset)
+            TablePage(session: session)
                 .toolbar(.hidden, for: .navigationBar)
         }
     }
 }
 
 struct TablePage: View {
-    let preset: TablePreset
+    private let session: TableSession
+
+    init(session: TableSession) {
+        self.session = session
+    }
+
+    init(preset: TablePreset, playsLive: Bool) {
+        self.init(session: TableSession(preset: preset, playsLive: playsLive))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,7 +54,7 @@ struct TablePage: View {
             .padding(.horizontal, 12)
             .padding(.top, 2)
             .padding(.bottom, 4)
-            TableScreen(preset: preset)
+            TableScreen(session: session)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(TableChrome.background.ignoresSafeArea())

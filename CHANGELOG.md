@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- On the table you can draw, take a discard, lay down, lay off, and discard. A refusal explains the move in plain words and leaves the hand as it was. The computer plays its turn one move at a time. When the hand ends, deal the next one and the score stays.
 - A TestFlight workflow uploads a signed Release build. The marketing version is 0.1.0. The build number is the Actions run number. The app answers export compliance as no. The icon is still a placeholder.
 - The iPhone table shows your hand face up, the computer's hand face down, the stock, every discard, both players' melds, the match scores, and whose turn it is. A menu loads a fresh deal, a mid-hand with layoffs, or a long discard pile. Debug lists stay behind a Debug button.
 - The computer plays a legal Rummy 500 hand from its own cards, the spread discard, the table, the stock count, and the match totals. It can take a deeper discard when that card melds at once and the extra cards are worth it. It lays down, lays off, and goes out. A debug build steps through a seeded match with Next move and Auto-play.

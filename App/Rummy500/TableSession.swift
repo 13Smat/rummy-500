@@ -1,0 +1,458 @@
+import Foundation
+import RummyEngine
+
+struct TableSession: Equatable {
+    private(set) var hand: HandState
+    private(set) var match: Match
+    private(set) var order: [Card]
+    private(set) var selected: [Card]
+    private(set) var notice: String?
+    private(set) var computerLine: String?
+    private(set) var menuPreset: TablePreset?
+    private(set) var computerPending: Bool
+    private(set) var beat: Int
+    let playsLive: Bool
+    private var recordedThisHand: Bool
+
+    var scene: TableScene {
+        .reading(
+            preset: menuPreset ?? .freshDeal,
+            hand: hand,
+            match: match,
+            yourHand: order
+        )
+    }
+
+    var owedCard: Card? {
+        guard hand.turn == .you, case .mustUsePickedCard(let card) = hand.phase else {
+            return nil
+        }
+        return card
+    }
+
+    var mustUseText: String? {
+        guard let owedCard else {
+            return nil
+        }
+        return "Play the \(CardLabel.spoken(owedCard)) before you do anything else."
+    }
+
+    var handResultText: String? {
+        guard let score = hand.handResult?.score else {
+            return nil
+        }
+        return "This hand: you \(score.you), computer \(score.computer)."
+    }
+
+    var nextHandTitle: String {
+        if case .won = match.conclusion {
+            return "Play again"
+        }
+        return "Deal the next hand"
+    }
+
+    var showsNextHand: Bool {
+        hand.handResult != nil
+    }
+
+    var showsLeavePile: Bool {
+        hand.turn == .you && hand.stock.count == 0 && hand.phase == .awaitingDraw
+    }
+
+    static func opening(seed: UInt64, playsLive: Bool) -> TableSession {
+        TableSession(
+            hand: HandState.deal(seed: Seed(seed)),
+            match: .opening,
+            playsLive: playsLive,
+            menuPreset: .freshDeal
+        )
+    }
+
+    init(preset: TablePreset, playsLive: Bool) {
+        self.init(
+            hand: TablePresets.hand(preset),
+            match: TablePresets.match(preset),
+            playsLive: playsLive,
+            menuPreset: preset
+        )
+    }
+
+    init(
+        hand: HandState,
+        match: Match,
+        playsLive: Bool,
+        menuPreset: TablePreset? = nil
+    ) {
+        self.hand = hand
+        self.match = match
+        self.playsLive = playsLive
+        self.menuPreset = menuPreset
+        order = TableScene.sortedHand(hand.you.cards)
+        selected = []
+        notice = nil
+        computerLine = nil
+        recordedThisHand = false
+        beat = 0
+        computerPending = false
+        if playsLive, hand.turn == .computer, hand.handResult == nil {
+            computerPending = true
+            beat = 1
+        }
+    }
+
+    func drawFromStock() -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        return applying(hand.drawFromStock())
+    }
+
+    func takeDiscard(_ card: Card) -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        return applying(hand.takeDiscard(card))
+    }
+
+    func leaveThePile() -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        return applying(hand.declineDiscardPile())
+    }
+
+    func layDownSelection() -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        if selected.isEmpty {
+            return refusing("Select the cards you want to lay down.")
+        }
+        return applying(hand.layDown(selected))
+    }
+
+    func layOffSelection(onMeld index: Int) -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        switch selected.count {
+        case 0:
+            return refusing("Select one card, then tap the meld.")
+        case 1:
+            return applying(hand.layOff(selected[0], onMeldAt: index))
+        default:
+            return refusing("Lay off one card at a time.")
+        }
+    }
+
+    func discardSelection() -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        switch selected.count {
+        case 0:
+            return refusing("Select the one card you want to discard.")
+        case 1:
+            return applying(hand.discard(selected[0]))
+        default:
+            return refusing("Discard one card.")
+        }
+    }
+
+    func toggle(_ card: Card) -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        guard order.contains(card) else {
+            return self
+        }
+        var copy = self
+        if let index = copy.selected.firstIndex(of: card) {
+            copy.selected.remove(at: index)
+        } else {
+            copy.selected.append(card)
+        }
+        return copy
+    }
+
+    func selecting(_ cards: [Card]) -> TableSession {
+        var copy = self
+        copy.selected = cards.filter { copy.order.contains($0) }
+        return copy
+    }
+
+    func sortBySuit() -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        var copy = self
+        copy.order = TableScene.sortedHand(order)
+        copy.notice = nil
+        return copy
+    }
+
+    func sortByRank() -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        var copy = self
+        copy.order = order.sorted { lhs, rhs in
+            if lhs.rank != rhs.rank {
+                return lhs.rank.rawValue < rhs.rank.rawValue
+            }
+            let left = Suit.allCases.firstIndex(of: lhs.suit) ?? 0
+            let right = Suit.allCases.firstIndex(of: rhs.suit) ?? 0
+            return left < right
+        }
+        copy.notice = nil
+        return copy
+    }
+
+    func moveSelection(by delta: Int) -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        guard let card = selected.first, let index = order.firstIndex(of: card) else {
+            return refusing("Select a card to move.")
+        }
+        let target = index + delta
+        guard order.indices.contains(target) else {
+            if delta < 0 {
+                return refusing("That card is already at the start of the hand.")
+            }
+            return refusing("That card is already at the end of the hand.")
+        }
+        var copy = self
+        copy.order.remove(at: index)
+        copy.order.insert(card, at: target)
+        copy.notice = nil
+        return copy
+    }
+
+    func stepComputer() -> TableSession {
+        guard hand.turn == .computer, hand.handResult == nil else {
+            var copy = self
+            copy.computerPending = false
+            return copy
+        }
+        switch ComputerTable.step(hand, youScore: match.you, computerScore: match.computer) {
+        case .failure(let error):
+            var copy = self
+            copy.computerPending = false
+            copy.notice = "The computer could not move. \(TurnWords.saying(error.rejection))"
+            return copy
+        case .success(let stepped):
+            var copy = self
+            copy.notice = nil
+            copy.adopt(stepped.state)
+            copy.computerLine = TurnWords.computer(stepped.play)
+            let stillComputer = stepped.state.turn == .computer && stepped.state.handResult == nil
+            copy.computerPending = stillComputer && playsLive
+            if stillComputer && playsLive {
+                copy.beat += 1
+            }
+            return copy
+        }
+    }
+
+    func dealNextHand() -> TableSession {
+        guard let result = hand.handResult else {
+            return refusing("This hand is still going.")
+        }
+        var scored = self
+        if !recordedThisHand, case .playing = match.conclusion {
+            scored.match = match.record(result)
+            scored.recordedThisHand = true
+            if case .won(let seat) = scored.match.conclusion {
+                scored.notice = seat == .you ? "You reached 500." : "The computer reached 500."
+            }
+        }
+        if case .won = scored.match.conclusion {
+            return TableSession.opening(seed: hand.seed.rawValue &+ 1, playsLive: playsLive)
+        }
+        let next = HandState.deal(
+            seed: Seed(hand.seed.rawValue &+ 1),
+            rotation: hand.rotation.nextHand()
+        )
+        return TableSession(hand: next, match: scored.match, playsLive: playsLive)
+    }
+
+    func mark(for card: Card) -> CardMark {
+        if card == owedCard {
+            return .owed
+        }
+        if selected.contains(card) {
+            return .selected
+        }
+        return .plain
+    }
+
+    private func gate() -> TableSession? {
+        if hand.handResult != nil {
+            return refusing("This hand is over.")
+        }
+        if hand.turn != .you {
+            return refusing("Wait for the computer.")
+        }
+        return nil
+    }
+
+    private func refusing(_ text: String) -> TableSession {
+        var copy = self
+        copy.notice = text
+        return copy
+    }
+
+    private func applying(_ result: Result<HandState, TurnRejection>) -> TableSession {
+        switch result {
+        case .failure(let reason):
+            return refusing(TurnWords.saying(reason))
+        case .success(let next):
+            var copy = self
+            copy.notice = nil
+            copy.computerLine = nil
+            copy.adopt(next)
+            if next.handResult != nil {
+                copy.computerPending = false
+            } else if next.turn == .computer {
+                copy.computerPending = playsLive
+                if playsLive {
+                    copy.beat += 1
+                }
+            }
+            return copy
+        }
+    }
+
+    private mutating func adopt(_ next: HandState) {
+        let cards = next.you.cards
+        let kept = order.filter { cards.contains($0) }
+        let extras = cards.filter { !kept.contains($0) }
+        order = kept + extras
+        selected = selected.filter { order.contains($0) }
+        hand = next
+        if let result = next.handResult, !recordedThisHand, case .playing = match.conclusion {
+            match = match.record(result)
+            recordedThisHand = true
+            if case .won(let seat) = match.conclusion {
+                notice = seat == .you ? "You reached 500." : "The computer reached 500."
+            }
+        }
+    }
+}
+
+enum CardMark: Equatable {
+    case plain
+    case selected
+    case owed
+}
+
+enum TableCardID {
+    static func hand(_ card: Card) -> String {
+        "hand-\(card.rank.rawValue)-\(CardLabel.letter(card.suit))"
+    }
+
+    static func discard(_ card: Card) -> String {
+        "discard-\(card.rank.rawValue)-\(CardLabel.letter(card.suit))"
+    }
+}
+
+enum TurnWords {
+    static func saying(_ rejection: TurnRejection) -> String {
+        switch rejection {
+        case .handIsOver:
+            return "This hand is over."
+        case .stillDrawing:
+            return "Draw a card before you play."
+        case .alreadyDrew:
+            return "You already drew. Meld, lay off, or discard."
+        case .stockIsEmpty:
+            return "The stock is empty."
+        case .stockStillHasCards:
+            return "The stock still has cards."
+        case .discardNotInPile:
+            return "That card is not in the discard pile."
+        case .discardCannotBeUsed:
+            return "Take that card only when you can meld it or lay it off right away."
+        case .mustMeldOrLayOffPickedCard(let card):
+            return "Play the \(CardLabel.spoken(card)) in a meld or a layoff first."
+        case .pickedCardNotUsed:
+            return "Include the card you took from the discard."
+        case .cardNotInHand:
+            return "Those cards are not all in your hand."
+        case .noSuchMeld:
+            return "That meld is not on the table."
+        case .meldRejected(let reason):
+            return saying(reason)
+        }
+    }
+
+    static func saying(_ rejection: MeldRejection) -> String {
+        switch rejection {
+        case .needsThreeCards:
+            return "A new meld needs at least three cards."
+        case .fiveOfAKind:
+            return "A set holds at most four cards."
+        case .duplicateCard:
+            return "That card is already in the meld."
+        case .mixedSuit:
+            return "A run has to stay in one suit."
+        case .wrapsAround:
+            return "A run cannot turn the corner from king to ace to 2."
+        case .notInSequence:
+            return "Those cards do not form a run."
+        case .doesNotFit:
+            return "That card does not fit this meld."
+        }
+    }
+
+    static func computer(_ play: ComputerPlay) -> String {
+        switch play {
+        case .drawFromStock:
+            return "Computer drew from the stock."
+        case .takeDiscard(let card):
+            return "Computer took the \(CardLabel.spoken(card))."
+        case .declineDiscardPile:
+            return "Computer left the discard pile."
+        case .layDown(let cards):
+            return "Computer laid down \(cards.count) cards."
+        case .layOff(let card, _):
+            return "Computer laid off the \(CardLabel.spoken(card))."
+        case .discard(let card):
+            return "Computer discarded the \(CardLabel.spoken(card))."
+        }
+    }
+}
+
+enum TableLaunch {
+    static func session() -> TableSession {
+        let args = ProcessInfo.processInfo.arguments
+        if let preset = preset(in: args) {
+            return TableSession(preset: preset, playsLive: true)
+        }
+        return TableSession.opening(seed: seed(in: args), playsLive: true)
+    }
+
+    private static func seed(in args: [String]) -> UInt64 {
+        guard let index = args.firstIndex(of: "-tableSeed"), index + 1 < args.count else {
+            return 0
+        }
+        return UInt64(args[index + 1]) ?? 0
+    }
+
+    private static func preset(in args: [String]) -> TablePreset? {
+        guard let index = args.firstIndex(of: "-tablePreset"), index + 1 < args.count else {
+            return nil
+        }
+        switch args[index + 1] {
+        case "freshDeal":
+            return .freshDeal
+        case "midHand":
+            return .midHand
+        case "longDiscard":
+            return .longDiscard
+        default:
+            return nil
+        }
+    }
+}

@@ -83,11 +83,22 @@ struct TableScene: Equatable {
     }
 
     static func load(_ preset: TablePreset) -> TableScene {
-        TableScene(
+        let hand = TablePresets.hand(preset)
+        return reading(
             preset: preset,
-            hand: TablePresets.hand(preset),
-            match: TablePresets.match(preset)
+            hand: hand,
+            match: TablePresets.match(preset),
+            yourHand: sortedHand(hand.you.cards)
         )
+    }
+
+    static func reading(
+        preset: TablePreset,
+        hand: HandState,
+        match: Match,
+        yourHand: [Card]
+    ) -> TableScene {
+        TableScene(preset: preset, hand: hand, match: match, yourHand: yourHand)
     }
 
     static func sortedHand(_ cards: [Card]) -> [Card] {
@@ -101,9 +112,9 @@ struct TableScene: Equatable {
         }
     }
 
-    private init(preset: TablePreset, hand: HandState, match: Match) {
+    private init(preset: TablePreset, hand: HandState, match: Match, yourHand: [Card]) {
         self.preset = preset
-        yourHand = Self.sortedHand(hand.you.cards)
+        self.yourHand = yourHand
         opponentCount = hand.computer.count
         stockCount = hand.stock.count
         discard = hand.discard.bottomToTop
@@ -282,4 +293,8 @@ enum TablePresets {
         .discard(Card(rank: .king, suit: .hearts)),
         .takeDiscard(Card(rank: .three, suit: .diamonds)),
     ]
+
+    static func handBeforeLongPick() -> HandState {
+        play(seed: longSeed, moves: Array(longMoves.dropLast()))
+    }
 }

@@ -2,19 +2,23 @@ import RummyEngine
 import SwiftUI
 
 struct TableScreen: View {
-    @State private var preset: TablePreset
+    @State private var session: TableSession
 
-    init(preset: TablePreset = .freshDeal) {
-        _preset = State(initialValue: preset)
+    init(session: TableSession) {
+        _session = State(initialValue: session)
+    }
+
+    init(preset: TablePreset = .freshDeal, playsLive: Bool = false) {
+        self.init(session: TableSession(preset: preset, playsLive: playsLive))
     }
 
     var body: some View {
-        let scene = TableScene.load(preset)
+        let scene = session.scene
         VStack(spacing: 8) {
             status(scene)
             presetMenu
             opponent(scene)
-            DragStrip(axis: .vertical) {
+            ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     meldBlock(
                         "Computer's melds",
@@ -29,33 +33,46 @@ struct TableScreen: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             piles(scene)
                 .layoutPriority(1)
             yourHand(scene)
+                .layoutPriority(1)
+            actions
                 .layoutPriority(1)
         }
         .padding(.horizontal, 10)
         .padding(.bottom, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .accessibilityIdentifier("table-screen")
+        .task(id: session.beat) {
+            guard session.computerPending else {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            session = session.stepComputer()
+        }
     }
 
     private var presetMenu: some View {
         HStack(spacing: 6) {
             ForEach(TablePreset.allCases) { item in
                 Button(item.title) {
-                    preset = item
+                    session = TableSession(preset: item, playsLive: session.playsLive)
                 }
-                .font(.caption.weight(item == preset ? .bold : .medium))
+                .font(.caption.weight(item == session.menuPreset ? .bold : .medium))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(
-                    Color.white.opacity(item == preset ? 0.22 : 0.08),
+                    Color.white.opacity(item == session.menuPreset ? 0.22 : 0.08),
                     in: Capsule()
                 )
-                .accessibilityAddTraits(item == preset ? .isSelected : [])
+                .accessibilityAddTraits(item == session.menuPreset ? .isSelected : [])
             }
         }
+        .buttonStyle(.plain)
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("preset-menu")
@@ -81,7 +98,41 @@ struct TableScreen: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("phase")
+            if let mustUse = session.mustUseText {
+                banner(mustUse, identifier: "must-use")
+            }
+            if let notice = session.notice {
+                banner(notice, identifier: "notice")
+            }
+            if let computerLine = session.computerLine {
+                Text(computerLine)
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("computer-line")
+            }
+            if let result = session.handResultText {
+                Text(result)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("hand-result")
+                chip(session.nextHandTitle, id: "deal-next") {
+                    session = session.dealNextHand()
+                }
+            }
         }
+    }
+
+    private func banner(_ text: String, identifier: String) -> some View {
+        Text(text)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(TableChrome.chipInk)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(TableChrome.chip, in: RoundedRectangle(cornerRadius: 8))
+            .accessibilityIdentifier(identifier)
     }
 
     private func score(_ name: String, _ value: Int, identifier: String) -> some View {
@@ -129,6 +180,7 @@ struct TableScreen: View {
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
+                .accessibilityIdentifier(identifier)
             if melds.isEmpty {
                 Text("None")
                     .font(.caption)
@@ -139,7 +191,6 @@ struct TableScreen: View {
                 }
             }
         }
-        .accessibilityIdentifier(identifier)
     }
 
     private func meldRow(_ meld: TableMeld) -> some View {
@@ -147,7 +198,7 @@ struct TableScreen: View {
             Text(meld.kindLabel)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.8))
-            DragStrip(axis: .horizontal, height: TableChrome.cardHeight + 28) {
+            ScrollView(.horizontal) {
                 HStack(alignment: .center, spacing: 6) {
                     ForEach(meld.cards, id: \.card) { entry in
                         meldCard(entry, in: meld)
@@ -155,7 +206,17 @@ struct TableScreen: View {
                 }
                 .padding(.vertical, 4)
             }
+            .scrollIndicators(.hidden)
+            .frame(height: TableChrome.cardHeight + 28)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            session = session.layOffSelection(onMeld: meld.id)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("meld-\(meld.id)")
+        .accessibilityLabel("\(meld.kindLabel), lay off here")
     }
 
     private func meldCard(_ entry: TableMeldCard, in meld: TableMeld) -> some View {
@@ -181,19 +242,24 @@ struct TableScreen: View {
 
     private func piles(_ scene: TableScene) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            VStack(spacing: 4) {
-                if scene.stockCount > 0 {
-                    CardBack()
-                } else {
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(Color.white.opacity(0.7), lineWidth: 1)
-                        .frame(width: TableChrome.cardWidth, height: TableChrome.cardHeight)
+            Button {
+                session = session.drawFromStock()
+            } label: {
+                VStack(spacing: 4) {
+                    if scene.stockCount > 0 {
+                        CardBack()
+                            .accessibilityHidden(true)
+                    } else {
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(Color.white.opacity(0.7), lineWidth: 1)
+                            .frame(width: TableChrome.cardWidth, height: TableChrome.cardHeight)
+                    }
+                    Text("Stock \(scene.stockCount)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
                 }
-                Text("Stock \(scene.stockCount)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white)
             }
-            .accessibilityElement(children: .combine)
+            .buttonStyle(.plain)
             .accessibilityLabel("Stock, \(scene.stockCount) cards")
             .accessibilityIdentifier("stock")
 
@@ -201,15 +267,26 @@ struct TableScreen: View {
                 Text("Discard \(scene.discard.count)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
-                DragStrip(axis: .horizontal, height: TableChrome.cardHeight) {
+                    .accessibilityIdentifier("discard")
+                ScrollView(.horizontal) {
                     HStack(spacing: TableChrome.discardStride - TableChrome.cardWidth) {
                         ForEach(scene.discard, id: \.self) { card in
-                            CardFace(card: card)
+                            Button {
+                                session = session.takeDiscard(card)
+                            } label: {
+                                CardFace(card: card)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(CardLabel.spoken(card))
+                            .accessibilityIdentifier(TableCardID.discard(card))
+                            .accessibilityAddTraits(.isButton)
                         }
                     }
                     .padding(.trailing, 2)
                 }
-                .accessibilityIdentifier("discard")
+                .scrollIndicators(.hidden)
+                .frame(height: TableChrome.cardHeight)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -220,19 +297,86 @@ struct TableScreen: View {
             Text("Your hand \(scene.yourHand.count)")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
-            DragStrip(axis: .horizontal, height: TableChrome.cardHeight) {
+                .accessibilityIdentifier("your-hand")
+            ScrollView(.horizontal) {
                 HStack(spacing: TableChrome.handGap) {
                     ForEach(Array(scene.yourHand.enumerated()), id: \.element) { index, card in
-                        CardFace(card: card)
-                            .padding(
-                                .leading,
-                                extraSuitGap(scene.yourHand, index: index)
-                            )
+                        Button {
+                            session = session.toggle(card)
+                        } label: {
+                            CardFace(card: card, mark: session.mark(for: card))
+                                .padding(.leading, extraSuitGap(scene.yourHand, index: index))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(handLabel(card))
+                        .accessibilityIdentifier(TableCardID.hand(card))
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAddTraits(session.selected.contains(card) ? .isSelected : [])
                     }
                 }
             }
-            .accessibilityIdentifier("your-hand")
+            .scrollIndicators(.hidden)
+            .frame(height: TableChrome.cardHeight)
         }
+    }
+
+    private func handLabel(_ card: Card) -> String {
+        if card == session.owedCard {
+            return "\(CardLabel.spoken(card)), play this card"
+        }
+        return CardLabel.spoken(card)
+    }
+
+    private var actions: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                chip("Lay down", id: "lay-down") {
+                    session = session.layDownSelection()
+                }
+                chip("Discard", id: "discard-action") {
+                    session = session.discardSelection()
+                }
+                chip("By suit", id: "sort-suit", label: "Sort by suit") {
+                    session = session.sortBySuit()
+                }
+                chip("By rank", id: "sort-rank", label: "Sort by rank") {
+                    session = session.sortByRank()
+                }
+                chip("Move left", id: "move-left") {
+                    session = session.moveSelection(by: -1)
+                }
+                chip("Move right", id: "move-right") {
+                    session = session.moveSelection(by: 1)
+                }
+                if session.showsLeavePile {
+                    chip("Leave the pile", id: "leave-pile") {
+                        session = session.leaveThePile()
+                    }
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .frame(height: 44)
+    }
+
+    private func chip(
+        _ title: String,
+        id: String,
+        label: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .background(Color.white.opacity(0.16), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label ?? title)
+        .accessibilityIdentifier(id)
     }
 
     private func extraSuitGap(_ cards: [Card], index: Int) -> CGFloat {
@@ -245,6 +389,7 @@ struct TableScreen: View {
 
 struct CardFace: View {
     let card: Card
+    var mark: CardMark = .plain
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -267,84 +412,21 @@ struct CardFace: View {
         .background(TableChrome.cardFace, in: RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Color.black.opacity(0.18), lineWidth: 1)
+                .strokeBorder(border, lineWidth: mark == .plain ? 1 : 3)
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(CardLabel.spoken(card))
     }
-}
 
-private struct StripLengthKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
-private struct DragStrip<Content: View>: View {
-    var axis: Axis
-    var height: CGFloat?
-    var content: Content
-    @State private var resting: CGFloat = 0
-    @GestureState private var drag: CGFloat = 0
-    @State private var contentLength: CGFloat = 0
-
-    init(axis: Axis, height: CGFloat? = nil, @ViewBuilder content: () -> Content) {
-        self.axis = axis
-        self.height = height
-        self.content = content()
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            let shown = clamped(resting + drag, viewport: length(of: geo.size))
-            content
-                .fixedSize(
-                    horizontal: axis == .horizontal,
-                    vertical: axis == .vertical
-                )
-                .background(lengthReader)
-                .offset(x: axis == .horizontal ? shown : 0, y: axis == .vertical ? shown : 0)
-                .frame(
-                    width: geo.size.width,
-                    height: axis == .horizontal ? (height ?? geo.size.height) : geo.size.height,
-                    alignment: axis == .horizontal ? .leading : .top
-                )
-                .clipped()
-                .gesture(pan(viewport: length(of: geo.size)))
-                .onPreferenceChange(StripLengthKey.self) { contentLength = $0 }
+    private var border: Color {
+        switch mark {
+        case .plain:
+            return Color.black.opacity(0.18)
+        case .selected:
+            return .white
+        case .owed:
+            return TableChrome.owed
         }
-        .frame(maxWidth: .infinity, maxHeight: height == nil ? .infinity : nil)
-        .frame(height: height)
-    }
-
-    private func length(of size: CGSize) -> CGFloat {
-        axis == .horizontal ? size.width : size.height
-    }
-
-    private var lengthReader: some View {
-        GeometryReader { inner in
-            Color.clear.preference(
-                key: StripLengthKey.self,
-                value: axis == .horizontal ? inner.size.width : inner.size.height
-            )
-        }
-    }
-
-    private func clamped(_ value: CGFloat, viewport: CGFloat) -> CGFloat {
-        let limit = min(0, viewport - contentLength)
-        return min(0, max(limit, value))
-    }
-
-    private func pan(viewport: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 8)
-            .updating($drag) { value, state, _ in
-                state = axis == .horizontal ? value.translation.width : value.translation.height
-            }
-            .onEnded { value in
-                let delta = axis == .horizontal ? value.translation.width : value.translation.height
-                resting = clamped(resting + delta, viewport: viewport)
-            }
     }
 }
 
