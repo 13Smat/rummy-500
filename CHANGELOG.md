@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Told agents to run /setup-pstack first, before any other pstack skill.
+- Added `Meld` in `RummyEngine`. A set of 3 or 4 and a suited run of 3 or more can be laid down. Ace-low and ace-high runs are legal. King, ace, 2, a mixed suit, and five of a kind are rejected.
+- A layoff can extend a set or a run, including a meld played by the other seat. Each card keeps the seat that played it.
+- A debug deal lists the largest legal melds in each hand.
 - Added hand scoring and a match total to 500 in `RummyEngine`. A debug build can score a scripted hand and show the totals.
 - Added cards, a 52-card deck, and a seeded two-player deal in `RummyEngine`.
 - A debug build can open that deal by seed and show both hands, the stock count, and the discard.
