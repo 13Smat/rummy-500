@@ -7,6 +7,9 @@ struct ContentView: View {
                 .font(.largeTitle)
             Text("You against the computer")
                 .foregroundStyle(.secondary)
+            #if DEBUG
+            DealDebugView()
+            #endif
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

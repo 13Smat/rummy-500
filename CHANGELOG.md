@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added cards, a 52-card deck, and a seeded two-player deal in `RummyEngine`.
+- A debug build can open that deal by seed and show both hands, the stock count, and the discard.
+
 ## 0.1.0
 
 - Added the Rummy 500 rules sheet, including the open questions.
