@@ -52,6 +52,8 @@ struct DealDebugView: View {
                 cardList(scene.discard)
                 ScoreDebugView()
                     .padding(.top, 12)
+                TurnDebugView()
+                    .padding(.top, 12)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
