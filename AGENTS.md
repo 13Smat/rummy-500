@@ -2,7 +2,7 @@
 
 ## Skills and style
 - pstack (github.com/backnotprop/pstack) is vendored under .cursor/skills/. Use /poteto-mode for all work in this repo, and use subagents for parallel research and self-contained tasks.
-- At the beginning of a new project, run /setup-pstack first, before any other pstack skill. If it has not been run in this repo yet, run it now.
+- Run /setup-pstack only if `.cursor/rules/pstack-models.mdc` is missing from the repo. It is already committed, so do not rerun it each session. Rerun it only when Andy asks to change the budget or models.
 - Reach for the matching pstack skill instead of improvising: /architect before non-trivial design, /how before changing code you have not read, /tdd for rules and bugs, /interrogate or /blast-radius before risky merges, /technical-writing, /bro and /unslop for anything a person reads.
 - Write for a reader: plain words, no jargon in player-facing text or docs, short README that gets someone running in 5 minutes.
 
