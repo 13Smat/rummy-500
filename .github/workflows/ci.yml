@@ -13,7 +13,8 @@ concurrency:
 jobs:
   engine:
     name: Engine tests
-    runs-on: ubuntu-latest
+    # ubuntu-latest is Ubuntu 26.04. setup-swift 2.4.0 rejects that release.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out the repo
