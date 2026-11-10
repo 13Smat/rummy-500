@@ -4,10 +4,9 @@ import XCTest
 @testable import Rummy500
 
 final class TableScreenshotTests: XCTestCase {
-    func testRenderEachPresetAtTwoPhoneWidths() async {
-        await MainActor.run {
-            renderEachPreset()
-        }
+    @MainActor
+    func testRenderEachPresetAtTwoPhoneWidths() {
+        renderEachPreset()
     }
 
     @MainActor
