@@ -63,6 +63,7 @@ PY
 
 xcodebuild -version
 xcodegen generate
+python3 scripts/clear_manual_identity.py Rummy500.xcodeproj/project.pbxproj
 
 archive_path="$RUNNER_TEMP/Rummy500.xcarchive"
 rm -rf "$archive_path"
@@ -82,7 +83,6 @@ xcodebuild archive \
   DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
   CODE_SIGNING_ALLOWED=YES \
   CODE_SIGNING_REQUIRED=YES \
-  CODE_SIGN_IDENTITY="Apple Distribution" \
   CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
 
 app="$archive_path/Products/Applications/Rummy500.app"
