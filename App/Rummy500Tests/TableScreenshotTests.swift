@@ -74,17 +74,17 @@ final class TableScreenshotTests: XCTestCase {
                 XCTAssertGreaterThan(data.count, 5_000)
                 XCTAssertGreaterThan(
                     pixels.cardFace,
-                    20_000,
+                    4_000,
                     "\(preset.title) on \(phone.name) did not draw the card faces"
                 )
                 XCTAssertGreaterThan(
                     pixels.wood,
-                    8_000,
+                    1_000,
                     "\(preset.title) on \(phone.name) did not draw the wood"
                 )
                 XCTAssertGreaterThan(
                     pixels.felt,
-                    8_000,
+                    1_000,
                     "\(preset.title) on \(phone.name) did not draw the felt"
                 )
                 XCTAssertLessThan(
@@ -113,7 +113,7 @@ final class TableScreenshotTests: XCTestCase {
         attachment.name = "\(name).png"
         attachment.lifetime = .keepAlways
         add(attachment)
-        XCTAssertGreaterThan(PixelCount(image).cardFace, 20_000, "\(name) did not draw the card faces")
+        XCTAssertGreaterThan(PixelCount(image).cardFace, 4_000, "\(name) did not draw the card faces")
     }
 
     @MainActor
@@ -254,13 +254,14 @@ private struct PixelCount {
                 }
                 return false
             }
-            var index = 0
             var pixel = 0
-            while index + 3 < bytes.count {
+            let total = width * height
+            while pixel < total {
+                let index = pixel * 4
                 let red = bytes[index]
                 let green = bytes[index + 1]
                 let blue = bytes[index + 2]
-                if cream(red, green, blue) {
+                if red > 220 && green > 210 && blue > 190 {
                     faces += 1
                 }
                 if red > 220 && green > 160 && green < 220 && blue < 40 {
@@ -272,33 +273,38 @@ private struct PixelCount {
                 if green > 70 && green < 170 && green > red + 20 && green > blue + 10 && red < 90 && blue < 120 {
                     feltCount += 1
                 }
-                let stillNeedInk = diamonds < 40 || clubs < 40 || hearts < 40 || spades < 40
-                if stillNeedInk, pixel % 2 == 0 {
+                pixel += 8
+            }
+            let suitTop = height * 3 / 5
+            var y = suitTop
+            while y < height && (diamonds < 40 || clubs < 40 || hearts < 40 || spades < 40) {
+                var x = 0
+                while x < width {
+                    let start = (y * width + x) * 4
+                    let red = bytes[start]
+                    let green = bytes[start + 1]
+                    let blue = bytes[start + 2]
                     let diamond = blue > 180 && red < 80 && green < 130
                     let club = red < 40 && green > 120 && green < 190 && blue < 100
                     let heart = red > 170 && green < 80 && blue < 90
                     let spade = red > 8 && red < 40 && green > 8 && green < 40 && blue > 8 && blue < 50
-                    if diamond || club || heart || spade {
-                        let x = pixel % width
-                        let y = pixel / width
-                        if nearCream(x, y) {
-                            if diamond {
-                                diamonds += 1
-                            }
-                            if club {
-                                clubs += 1
-                            }
-                            if heart {
-                                hearts += 1
-                            }
-                            if spade {
-                                spades += 1
-                            }
+                    if (diamond || club || heart || spade), nearCream(x, y) {
+                        if diamond {
+                            diamonds += 1
+                        }
+                        if club {
+                            clubs += 1
+                        }
+                        if heart {
+                            hearts += 1
+                        }
+                        if spade {
+                            spades += 1
                         }
                     }
+                    x += 2
                 }
-                index += 4
-                pixel += 1
+                y += 2
             }
         }
         cardFace = faces
