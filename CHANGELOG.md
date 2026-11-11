@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Drag cards into the play area to build a meld. Play stays visible and turns on when those cards are a legal meld or a layoff onto one meld. X sends them back to your hand. VoiceOver can move a card in or out without a drag.
 - The TestFlight archive is unsigned. Export signs it for App Store distribution, so the upload does not need a registered device.
 - The TestFlight archive command does not pass a signing identity. A distribution identity on that command conflicted with the app target and with the RummyEngine package.
 - On the table you can draw, take a discard, lay down, lay off, and discard. A refusal explains the move in plain words and leaves the hand as it was. The computer plays its turn one move at a time. When the hand ends, deal the next one and the score stays.

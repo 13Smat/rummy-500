@@ -6,6 +6,7 @@ struct TableSession: Equatable {
     private(set) var match: Match
     private(set) var order: [Card]
     private(set) var selected: [Card]
+    private(set) var playArea: PlayArea
     private(set) var notice: String?
     private(set) var computerLine: String?
     private(set) var menuPreset: TablePreset?
@@ -35,6 +36,25 @@ struct TableSession: Equatable {
             return nil
         }
         return "Play the \(CardLabel.spoken(owedCard)) before you do anything else."
+    }
+
+    var playIsEnabled: Bool {
+        guard hand.turn == .you, hand.handResult == nil else {
+            return false
+        }
+        switch playArea.offer(in: hand) {
+        case .layDown, .layOff:
+            return true
+        case .notReady, .needsPickedCard, .ambiguous:
+            return false
+        }
+    }
+
+    var playRefusal: String? {
+        guard hand.turn == .you, case .needsPickedCard = playArea.offer(in: hand) else {
+            return nil
+        }
+        return TurnWords.saying(.pickedCardNotUsed)
     }
 
     var handResultText: String? {
@@ -89,6 +109,7 @@ struct TableSession: Equatable {
         self.menuPreset = menuPreset
         order = TableScene.sortedHand(hand.you.cards)
         selected = []
+        playArea = PlayArea(cards: [])
         notice = nil
         computerLine = nil
         recordedThisHand = false
@@ -156,6 +177,88 @@ struct TableSession: Equatable {
             return applying(hand.discard(selected[0]))
         default:
             return refusing("Discard one card.")
+        }
+    }
+
+    func stage(_ card: Card) -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        guard let index = order.firstIndex(of: card), !playArea.cards.contains(card) else {
+            return self
+        }
+        var copy = self
+        copy.order.remove(at: index)
+        copy.selected.removeAll { $0 == card }
+        copy.playArea = copy.playArea.adding(card)
+        copy.notice = nil
+        return copy
+    }
+
+    func unstage(_ card: Card) -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        guard playArea.cards.contains(card) else {
+            return self
+        }
+        var copy = self
+        copy.playArea = copy.playArea.removing(card)
+        if !copy.order.contains(card) {
+            copy.order.append(card)
+        }
+        copy.notice = nil
+        return copy
+    }
+
+    func clearPlayArea() -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        guard !playArea.cards.isEmpty else {
+            return self
+        }
+        var copy = self
+        for card in copy.playArea.cards where !copy.order.contains(card) {
+            copy.order.append(card)
+        }
+        copy.playArea = PlayArea(cards: [])
+        copy.notice = nil
+        return copy
+    }
+
+    func playStaged() -> TableSession {
+        if let blocked = gate() {
+            return blocked
+        }
+        if playArea.cards.isEmpty {
+            return refusing("Move cards into the play area first.")
+        }
+        switch playArea.applied(to: hand) {
+        case .success(let next):
+            var played = applying(.success(next))
+            played.playArea = PlayArea(cards: [])
+            return played
+        case .failure(let reason):
+            if case .ambiguous = playArea.offer(in: hand) {
+                return refusing("Those cards fit more than one meld.")
+            }
+            return refusing(TurnWords.saying(reason))
+        }
+    }
+
+    func receive(_ drag: DraggedCard, in zone: CardDropZone) -> TableSession {
+        let pool = order + playArea.cards
+        guard let card = drag.card(in: pool) else {
+            return self
+        }
+        switch CardDragRoute.intent(origin: drag.origin, zone: zone) {
+        case .stage:
+            return stage(card)
+        case .unstage:
+            return unstage(card)
+        case nil:
+            return self
         }
     }
 
@@ -326,8 +429,11 @@ struct TableSession: Equatable {
 
     private mutating func adopt(_ next: HandState) {
         let cards = next.you.cards
-        let kept = order.filter { cards.contains($0) }
-        let extras = cards.filter { !kept.contains($0) }
+        playArea = PlayArea(cards: playArea.cards.filter { cards.contains($0) })
+        let staged = playArea.cards
+        let visible = cards.filter { !staged.contains($0) }
+        let kept = order.filter { visible.contains($0) }
+        let extras = visible.filter { !kept.contains($0) }
         order = kept + extras
         selected = selected.filter { order.contains($0) }
         hand = next
@@ -354,6 +460,10 @@ enum TableCardID {
 
     static func discard(_ card: Card) -> String {
         "discard-\(card.rank.rawValue)-\(CardLabel.letter(card.suit))"
+    }
+
+    static func staged(_ card: Card) -> String {
+        "play-\(card.rank.rawValue)-\(CardLabel.letter(card.suit))"
     }
 }
 
@@ -425,12 +535,34 @@ enum TurnWords {
 }
 
 enum TableLaunch {
+    static let readyMeld = "readyMeld"
+
     static func session() -> TableSession {
-        let args = ProcessInfo.processInfo.arguments
+        session(arguments: ProcessInfo.processInfo.arguments)
+    }
+
+    static func session(arguments args: [String]) -> TableSession {
+        if let fixture = fixture(in: args) {
+            return fixture
+        }
         if let preset = preset(in: args) {
             return TableSession(preset: preset, playsLive: true)
         }
         return TableSession.opening(seed: seed(in: args), playsLive: true)
+    }
+
+    private static func fixture(in args: [String]) -> TableSession? {
+        guard let index = args.firstIndex(of: "-tableFixture"), index + 1 < args.count else {
+            return nil
+        }
+        guard args[index + 1] == readyMeld else {
+            return nil
+        }
+        return TableSession(
+            hand: HandState.scriptedPlay()[1],
+            match: .opening,
+            playsLive: false
+        )
     }
 
     private static func seed(in args: [String]) -> UInt64 {
