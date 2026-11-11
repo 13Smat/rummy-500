@@ -103,42 +103,74 @@ final class PlayAreaTests: XCTestCase {
     }
 
     func testADragStagesAndAReturnDragUnstages() {
-        XCTAssertEqual(
-            CardDragRoute.intent(origin: .hand, zone: .playArea),
-            .stage
+        let layout = TableLayout(
+            zones: [
+                .playArea: CGRect(x: 0, y: 0, width: 200, height: 80),
+                .hand: CGRect(x: 0, y: 200, width: 200, height: 80),
+                .discard: CGRect(x: 220, y: 0, width: 80, height: 80),
+            ],
+            handSlots: [
+                HandSlot(index: 0, card: .hand(seven), frame: CGRect(x: 0, y: 200, width: 48, height: 68)),
+                HandSlot(index: 2, card: .hand(nine), frame: CGRect(x: 120, y: 200, width: 48, height: 68)),
+            ]
         )
-        XCTAssertEqual(
-            CardDragRoute.intent(origin: .playArea, zone: .hand),
-            .unstage
-        )
-        XCTAssertNil(CardDragRoute.intent(origin: .hand, zone: .hand))
-        XCTAssertNil(CardDragRoute.intent(origin: .playArea, zone: .playArea))
-
-        let play = CGRect(x: 0, y: 0, width: 200, height: 80)
-        let hand = CGRect(x: 0, y: 200, width: 200, height: 80)
-        let frames: [CardDropZone: CGRect] = [.playArea: play, .hand: hand]
         let dragged = DraggedCard.hand(seven)
         XCTAssertEqual(
-            CardDragRoute.zone(for: dragged, at: CGPoint(x: 40, y: 40), in: frames),
-            .playArea
+            CardDragRoute.drop(dragged, at: CGPoint(x: 40, y: 40), in: layout),
+            .stage(dragged)
         )
         XCTAssertEqual(
-            CardDragRoute.zone(for: dragged, at: CGPoint(x: 40, y: 90), in: frames),
-            .playArea
+            CardDragRoute.drop(dragged, at: CGPoint(x: 40, y: 90), in: layout),
+            .stage(dragged)
         )
         XCTAssertEqual(
-            CardDragRoute.zone(for: dragged, at: CGPoint(x: 40, y: 220), in: frames),
-            .hand
+            CardDragRoute.drop(dragged, at: CGPoint(x: 144, y: 234), in: layout),
+            .placeInHand(dragged, at: 2)
         )
-        XCTAssertNil(CardDragRoute.zone(for: dragged, at: CGPoint(x: 40, y: 140), in: frames))
+        XCTAssertEqual(
+            CardDragRoute.drop(dragged, at: CGPoint(x: 230, y: 40), in: layout),
+            .discard(dragged)
+        )
+        XCTAssertNil(CardDragRoute.drop(dragged, at: CGPoint(x: 40, y: 140), in: layout))
 
         let ready = readyToMeld()
-        let staged = ready.receive(DraggedCard.hand(seven), in: .playArea)
+        let staged = ready.receive(.stage(.hand(seven)))
         XCTAssertEqual(staged.playArea.cards, [seven])
-        let back = staged.receive(DraggedCard.playArea(seven), in: .hand)
+        let back = staged.receive(.placeInHand(.playArea(seven), at: staged.order.count))
         XCTAssertTrue(back.playArea.cards.isEmpty)
         XCTAssertEqual(back.order.last, seven)
-        XCTAssertEqual(staged.receive(DraggedCard.hand(seven), in: .hand).playArea.cards, [seven])
+        XCTAssertEqual(staged.receive(.placeInHand(.hand(twoClubs), at: 0)).playArea.cards, [seven])
+    }
+
+    func testFiveThenSixAndJackThenTenExtendTheDiamondRun() {
+        let five = Card(rank: .five, suit: .diamonds)
+        let six = Card(rank: .six, suit: .diamonds)
+        let seven = Card(rank: .seven, suit: .diamonds)
+        let eight = Card(rank: .eight, suit: .diamonds)
+        let nine = Card(rank: .nine, suit: .diamonds)
+        let ten = Card(rank: .ten, suit: .diamonds)
+        let jack = Card(rank: .jack, suit: .diamonds)
+        let drawn = TableSession.opening(seed: 8029, playsLive: false).drawFromStock()
+        let laid = drawn.stage(seven).stage(eight).stage(nine).playStaged()
+        XCTAssertNil(laid.notice)
+        XCTAssertEqual(laid.hand.melds.map(\.cards), [[seven, eight, nine]])
+
+        let lowFirst = laid.stage(five).stage(six)
+        XCTAssertTrue(lowFirst.playIsEnabled)
+        let low = lowFirst.playStaged()
+        XCTAssertNil(low.notice)
+        XCTAssertEqual(low.hand.melds[0].cards, [five, six, seven, eight, nine])
+
+        let lowReverse = laid.stage(six).stage(five).playStaged()
+        XCTAssertEqual(lowReverse.hand.melds[0].cards, [five, six, seven, eight, nine])
+        XCTAssertFalse(laid.stage(five).playIsEnabled)
+
+        let high = laid.stage(jack).stage(ten).playStaged()
+        XCTAssertNil(high.notice)
+        XCTAssertEqual(high.hand.melds[0].cards, [seven, eight, nine, ten, jack])
+
+        let highReverse = laid.stage(ten).stage(jack).playStaged()
+        XCTAssertEqual(highReverse.hand.melds[0].cards, [seven, eight, nine, ten, jack])
     }
 
     func testPlayStaysOffUntilYouHaveDrawn() {
@@ -161,10 +193,26 @@ final class PlayAreaTests: XCTestCase {
         XCTAssertFalse(blocked.playIsEnabled)
     }
 
+    func testTheOnlyStagedCardCanBeDiscarded() {
+        let ready = readyToMeld()
+        let staged = ready.stage(twoClubs)
+        let discarded = staged.receive(.discard(.playArea(twoClubs)))
+        XCTAssertNil(discarded.notice)
+        XCTAssertTrue(discarded.playArea.cards.isEmpty)
+        XCTAssertFalse(discarded.hand.you.cards.contains(twoClubs))
+        XCTAssertEqual(discarded.hand.turn, .computer)
+
+        let pair = ready.stage(seven).stage(eight)
+        let refused = pair.receive(.discard(.playArea(seven)))
+        XCTAssertEqual(refused.notice, "Discard one card.")
+        XCTAssertEqual(refused.hand, pair.hand)
+        XCTAssertEqual(refused.playArea.cards, [seven, eight])
+    }
+
     func testADiscardKeepsTheStagedCards() {
         let ready = readyToMeld()
         let staged = ready.stage(seven)
-        let discarded = staged.selecting([twoClubs]).discardSelection()
+        let discarded = staged.receive(.discard(.hand(twoClubs)))
         XCTAssertNil(discarded.notice)
         XCTAssertEqual(discarded.playArea.cards, [seven])
         XCTAssertFalse(discarded.order.contains(seven))

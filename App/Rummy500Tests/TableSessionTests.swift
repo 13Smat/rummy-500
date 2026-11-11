@@ -8,7 +8,7 @@ final class TableSessionTests: XCTestCase {
         XCTAssertEqual(session.scene.turnLabel, "Your turn")
         XCTAssertEqual(session.scene.phaseLabel, "Draw a card")
 
-        let blocked = session.selecting([session.order[0]]).discardSelection()
+        let blocked = session.receive(.discard(.hand(session.order[0])))
         XCTAssertEqual(blocked.hand, session.hand)
         XCTAssertEqual(blocked.notice, "Draw a card before you play.")
 
@@ -21,7 +21,7 @@ final class TableSessionTests: XCTestCase {
         XCTAssertEqual(again.hand, drawn)
         XCTAssertEqual(again.notice, "You already drew. Meld, lay off, or discard.")
 
-        session = session.selecting([session.order[0]]).discardSelection()
+        session = session.receive(.discard(.hand(session.order[0])))
         XCTAssertEqual(session.hand.turn, .computer)
         XCTAssertNil(session.notice)
         var steps = 0
@@ -40,7 +40,7 @@ final class TableSessionTests: XCTestCase {
     func testALiveDiscardArmsTheComputerTurn() {
         let dealt = TableSession.opening(seed: 0, playsLive: true)
         let drawn = dealt.drawFromStock()
-        let discarded = drawn.selecting([drawn.order[0]]).discardSelection()
+        let discarded = drawn.receive(.discard(.hand(drawn.order[0])))
         XCTAssertEqual(discarded.hand.turn, .computer)
         XCTAssertTrue(discarded.computerPending)
         XCTAssertGreaterThan(discarded.beat, 0)
@@ -68,12 +68,12 @@ final class TableSessionTests: XCTestCase {
         XCTAssertEqual(after.order.count, before.order.count + taken.count)
 
         let others = after.order.filter { $0 != buried }
-        let leftOut = after.selecting(Array(others.prefix(3))).layDownSelection()
+        let leftOut = others.prefix(3).reduce(after) { $0.stage($1) }.playStaged()
         XCTAssertEqual(leftOut.hand, after.hand)
         XCTAssertEqual(leftOut.notice, "Include the card you took from the discard.")
 
         let other = try XCTUnwrap(others.first)
-        let discarded = after.selecting([other]).discardSelection()
+        let discarded = after.receive(.discard(.hand(other)))
         XCTAssertEqual(discarded.hand, after.hand)
         XCTAssertEqual(
             discarded.notice,
@@ -95,7 +95,7 @@ final class TableSessionTests: XCTestCase {
         XCTAssertTrue(taken.order.contains(Card(rank: .nine, suit: .clubs)))
         XCTAssertTrue(taken.hand.discard.bottomToTop.isEmpty)
 
-        let laid = taken.selecting([buried]).layOffSelection(onMeld: 1)
+        let laid = taken.stage(buried).playStaged()
         XCTAssertNil(laid.notice)
         XCTAssertNil(laid.owedCard)
         XCTAssertEqual(laid.hand, trace[8])
@@ -118,17 +118,17 @@ final class TableSessionTests: XCTestCase {
         XCTAssertEqual(missing.hand, opening.hand)
 
         let fresh = TableSession.opening(seed: 0, playsLive: false)
-        XCTAssertEqual(fresh.leaveThePile().notice, "The stock still has cards.")
-        XCTAssertEqual(fresh.leaveThePile().hand, fresh.hand)
-        XCTAssertEqual(fresh.layDownSelection().notice, "Select the cards you want to lay down.")
+        XCTAssertEqual(fresh.playStaged().notice, "Move cards into the play area first.")
+        XCTAssertEqual(fresh.playStaged().hand, fresh.hand)
+        XCTAssertEqual(fresh.tapTurn().hand, fresh.hand)
 
         let drawn = fresh.drawFromStock()
-        let two = drawn.selecting(Array(drawn.order.prefix(2))).layDownSelection()
+        let two = drawn.order.prefix(2).reduce(drawn) { $0.stage($1) }.playStaged()
         XCTAssertEqual(two.notice, "A new meld needs at least three cards.")
         XCTAssertEqual(two.hand, drawn.hand)
 
-        let nowhere = drawn.selecting([drawn.order[0]]).layOffSelection(onMeld: 3)
-        XCTAssertEqual(nowhere.notice, "That meld is not on the table.")
+        let nowhere = drawn.stage(drawn.order[0]).playStaged()
+        XCTAssertEqual(nowhere.notice, "A new meld needs at least three cards.")
         XCTAssertEqual(nowhere.hand, drawn.hand)
 
         let waiting = TableSession(preset: .midHand, playsLive: false)
@@ -140,9 +140,9 @@ final class TableSessionTests: XCTestCase {
         let trace = HandState.scriptedPlay()
         let laid = TableSession(hand: trace[8], match: .opening, playsLive: false)
         let two = Card(rank: .two, suit: .clubs)
-        let missed = laid.selecting([two]).layOffSelection(onMeld: 0)
+        let missed = laid.stage(two).playStaged()
         XCTAssertEqual(missed.hand, laid.hand)
-        XCTAssertEqual(missed.notice, "A run has to stay in one suit.")
+        XCTAssertEqual(missed.notice, "A new meld needs at least three cards.")
     }
 
     func testSortAndMoveKeepTheSameCards() {
@@ -156,19 +156,19 @@ final class TableSessionTests: XCTestCase {
         let bySuit = byRank.sortBySuit()
         XCTAssertEqual(bySuit.order, TableScene.sortedHand(dealtCards))
         let first = bySuit.order[0]
-        let moved = bySuit.selecting([first]).moveSelection(by: 1)
+        let moved = bySuit.nudge(first, by: 1)
         XCTAssertEqual(moved.order[1], first)
         XCTAssertEqual(moved.order[0], bySuit.order[1])
         XCTAssertEqual(Set(moved.order), Set(dealtCards))
         XCTAssertEqual(moved.hand, dealt.hand)
 
-        let stuck = moved.selecting([moved.order[0]]).moveSelection(by: -1)
+        let stuck = moved.nudge(moved.order[0], by: -1)
         XCTAssertEqual(stuck.order, moved.order)
-        XCTAssertEqual(stuck.notice, "That card is already at the start of the hand.")
+        XCTAssertNil(stuck.notice)
     }
 
     func testGoingOutDealsTheNextHandWithTheScore() throws {
-        let ended = try XCTUnwrap(sessionWhereYouGoOut(), "no seed in 0..<80 ended with you going out")
+        let ended = try XCTUnwrap(sessionWhereYouGoOut(), "no seed in 0..<200 ended with you going out")
         XCTAssertEqual(ended.scene.phaseLabel, "You went out")
         XCTAssertEqual(ended.scene.turnLabel, "Hand over")
         XCTAssertTrue(ended.order.isEmpty)
@@ -179,7 +179,7 @@ final class TableSessionTests: XCTestCase {
         XCTAssertEqual(ended.match.hands.count, 1)
         XCTAssertEqual(ended.handResultText, "This hand: you \(result.score.you), computer \(result.score.computer).")
 
-        let next = ended.dealNextHand()
+        let next = ended.tapTurn()
         XCTAssertEqual(next.match, ended.match)
         XCTAssertEqual(next.hand.you.cards.count, 13)
         XCTAssertEqual(next.hand.computer.cards.count, 13)
@@ -228,7 +228,7 @@ final class TableSessionTests: XCTestCase {
     }
 
     private func sessionWhereYouGoOut() -> TableSession? {
-        for seed in UInt64(0)..<80 {
+        for seed in UInt64(0)..<200 {
             var session = TableSession.opening(seed: seed, playsLive: false)
             for _ in 0..<400 {
                 if case .handOver(.goneOut(.you)) = session.hand.phase {
@@ -249,6 +249,61 @@ final class TableSessionTests: XCTestCase {
         return nil
     }
 
+    func testPlacingACardKeepsTheFullOrderIndexMovingRightAndLeft() {
+        let dealt = TableSession.opening(seed: 0, playsLive: false)
+        let order = dealt.order
+        let movingRight = order[0]
+        let movedRight = dealt.receive(.placeInHand(.hand(movingRight), at: 2))
+        var expectedRight = order
+        expectedRight.remove(at: 0)
+        expectedRight.insert(movingRight, at: 2)
+        XCTAssertEqual(movedRight.order, expectedRight)
+        XCTAssertEqual(movedRight.order[2], movingRight)
+        XCTAssertEqual(movedRight.hand, dealt.hand)
+
+        let movingLeft = order[order.count - 1]
+        let movedLeft = dealt.receive(.placeInHand(.hand(movingLeft), at: 0))
+        var expectedLeft = order
+        expectedLeft.removeLast()
+        expectedLeft.insert(movingLeft, at: 0)
+        XCTAssertEqual(movedLeft.order, expectedLeft)
+        XCTAssertEqual(movedLeft.order[0], movingLeft)
+        XCTAssertEqual(movedLeft.hand, dealt.hand)
+
+        let middle = order[1]
+        let nudgedRight = dealt.nudge(middle, by: 1)
+        var expectedNudgeRight = order
+        expectedNudgeRight.remove(at: 1)
+        expectedNudgeRight.insert(middle, at: 2)
+        XCTAssertEqual(nudgedRight.order, expectedNudgeRight)
+
+        let nudgedLeft = dealt.nudge(middle, by: -1)
+        var expectedNudgeLeft = order
+        expectedNudgeLeft.remove(at: 1)
+        expectedNudgeLeft.insert(middle, at: 0)
+        XCTAssertEqual(nudgedLeft.order, expectedNudgeLeft)
+    }
+
+    func testCuesFollowThePhaseAndTheEmptyStockLeavesThePile() {
+        let dealt = TableSession.opening(seed: 0, playsLive: false)
+        XCTAssertEqual(dealt.cue, .draw)
+        XCTAssertFalse(dealt.accepts(.discard(.hand(dealt.order[0]))))
+        let refused = dealt.receive(.discard(.hand(dealt.order[0])))
+        XCTAssertEqual(refused.notice, "Draw a card before you play.")
+
+        let drawn = dealt.drawFromStock()
+        XCTAssertEqual(drawn.cue, .discard)
+        XCTAssertTrue(drawn.accepts(.discard(.hand(drawn.order[0]))))
+
+        let empty = TableSession(hand: HandState.scriptedPlay()[6], match: .opening, playsLive: false)
+        XCTAssertEqual(empty.cue, .pass)
+        let left = empty.tapStock()
+        XCTAssertEqual(left.hand.phase, .handOver(.stockExhausted))
+        XCTAssertEqual(dealt.tapTurn().hand, dealt.hand)
+        XCTAssertEqual(left.cue, .handOver)
+        XCTAssertEqual(left.tapTurn().hand.you.cards.count, 13)
+    }
+
     private func applyYourChoice(_ session: TableSession) -> TableSession {
         let view = SeatView(
             hand: session.hand,
@@ -262,13 +317,13 @@ final class TableSessionTests: XCTestCase {
         case .takeDiscard(let card):
             return session.takeDiscard(card)
         case .declineDiscardPile:
-            return session.leaveThePile()
+            return session.tapStock()
         case .layDown(let cards):
-            return session.selecting(cards).layDownSelection()
-        case .layOff(let card, meldIndex: let index):
-            return session.selecting([card]).layOffSelection(onMeld: index)
+            return cards.reduce(session) { $0.stage($1) }.playStaged()
+        case .layOff(let card, meldIndex: _):
+            return session.stage(card).playStaged()
         case .discard(let card):
-            return session.selecting([card]).discardSelection()
+            return session.receive(.discard(.hand(card)))
         }
     }
 }

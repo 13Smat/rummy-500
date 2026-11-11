@@ -4,41 +4,96 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-struct DraggedCard: Hashable, Codable, Sendable, Transferable {
-    var rank: Int
-    var suit: String
-    var origin: Origin
-
-    enum Origin: String, Codable, Hashable, Sendable {
-        case hand
-        case playArea
-    }
+enum DraggedCard: Hashable, Codable, Sendable, Transferable {
+    case hand(rank: Int, suit: String)
+    case playArea(rank: Int, suit: String)
+    case discard(rank: Int, suit: String)
+    case stock
 
     static var transferRepresentation: some TransferRepresentation {
         CodableRepresentation(contentType: .json)
     }
 
     static func hand(_ card: Card) -> DraggedCard {
-        DraggedCard(rank: card.rank.rawValue, suit: CardLabel.letter(card.suit), origin: .hand)
+        DraggedCard.hand(rank: card.rank.rawValue, suit: CardLabel.letter(card.suit))
     }
 
     static func playArea(_ card: Card) -> DraggedCard {
-        DraggedCard(rank: card.rank.rawValue, suit: CardLabel.letter(card.suit), origin: .playArea)
+        DraggedCard.playArea(rank: card.rank.rawValue, suit: CardLabel.letter(card.suit))
+    }
+
+    static func discard(_ card: Card) -> DraggedCard {
+        DraggedCard.discard(rank: card.rank.rawValue, suit: CardLabel.letter(card.suit))
     }
 
     func card(in cards: [Card]) -> Card? {
-        cards.first { $0.rank.rawValue == rank && CardLabel.letter($0.suit) == suit }
+        let rank: Int
+        let suit: String
+        switch self {
+        case .hand(let value, let letter),
+             .playArea(let value, let letter),
+             .discard(let value, let letter):
+            rank = value
+            suit = letter
+        case .stock:
+            return nil
+        }
+        return cards.first { $0.rank.rawValue == rank && CardLabel.letter($0.suit) == suit }
     }
 }
 
 enum CardDropZone: Hashable {
     case hand
     case playArea
+    case discard
 }
 
-enum CardDragIntent: Equatable {
-    case stage
-    case unstage
+enum CardDrop: Equatable {
+    case drawStock
+    case takeDiscard(DraggedCard)
+    case discard(DraggedCard)
+    case stage(DraggedCard)
+    case placeInHand(DraggedCard, at: Int)
+
+    var zone: CardDropZone {
+        switch self {
+        case .drawStock, .takeDiscard, .placeInHand:
+            return .hand
+        case .discard:
+            return .discard
+        case .stage:
+            return .playArea
+        }
+    }
+}
+
+struct HandSlot: Equatable {
+    var index: Int
+    var card: DraggedCard
+    var frame: CGRect
+}
+
+struct TableLayout: Equatable {
+    var zones: [CardDropZone: CGRect]
+    var handSlots: [HandSlot]
+
+    func slotsInOrder() -> [HandSlot] {
+        var latest: [Int: HandSlot] = [:]
+        for slot in handSlots {
+            latest[slot.index] = slot
+        }
+        return latest.keys.sorted().compactMap { latest[$0] }
+    }
+}
+
+struct TableLayoutKey: PreferenceKey {
+    static var defaultValue: TableLayout { TableLayout(zones: [:], handSlots: []) }
+
+    static func reduce(value: inout TableLayout, nextValue: () -> TableLayout) {
+        let next = nextValue()
+        value.zones.merge(next.zones, uniquingKeysWith: { _, new in new })
+        value.handSlots.append(contentsOf: next.handSlots)
+    }
 }
 
 enum TableSpace {
@@ -51,46 +106,64 @@ struct CardLift: Equatable {
 }
 
 enum CardDragRoute {
-    static func intent(origin: DraggedCard.Origin, zone: CardDropZone) -> CardDragIntent? {
-        switch (origin, zone) {
-        case (.hand, .playArea):
-            return .stage
-        case (.playArea, .hand):
-            return .unstage
-        case (.hand, .hand), (.playArea, .playArea):
+    static func drop(
+        _ payload: DraggedCard,
+        at location: CGPoint,
+        in layout: TableLayout
+    ) -> CardDrop? {
+        switch payload {
+        case .stock:
+            return hits(.hand, at: location, in: layout, slop: 20) ? .drawStock : nil
+        case .discard(_, _):
+            return hits(.hand, at: location, in: layout, slop: 20) ? .takeDiscard(payload) : nil
+        case .hand(_, _), .playArea(_, _):
+            if hits(.discard, at: location, in: layout, slop: 0) {
+                return .discard(payload)
+            }
+            if case .hand = payload, hits(.playArea, at: location, in: layout, slop: 20) {
+                return .stage(payload)
+            }
+            guard hits(.hand, at: location, in: layout, slop: 20) else {
+                return nil
+            }
+            guard let index = nearestIndex(to: location, in: layout) else {
+                return nil
+            }
+            return .placeInHand(payload, at: index)
+        }
+    }
+
+    private static func hits(
+        _ zone: CardDropZone,
+        at location: CGPoint,
+        in layout: TableLayout,
+        slop: CGFloat
+    ) -> Bool {
+        guard let frame = layout.zones[zone] else {
+            return false
+        }
+        return frame.insetBy(dx: -slop, dy: -slop).contains(location)
+    }
+
+    private static func nearestIndex(to location: CGPoint, in layout: TableLayout) -> Int? {
+        let slots = layout.slotsInOrder()
+        guard !slots.isEmpty else {
             return nil
         }
-    }
-
-    static func zone(
-        for payload: DraggedCard,
-        at location: CGPoint,
-        in frames: [CardDropZone: CGRect]
-    ) -> CardDropZone? {
-        let order: [CardDropZone]
-        switch payload.origin {
-        case .hand:
-            order = [.playArea, .hand]
-        case .playArea:
-            order = [.hand, .playArea]
-        }
-        return order.first { zone in
-            guard let frame = frames[zone] else {
-                return false
+        return slots.min { lhs, rhs in
+            let left = distance(lhs.frame, location)
+            let right = distance(rhs.frame, location)
+            if left == right {
+                return lhs.index < rhs.index
             }
-            return frame.insetBy(dx: -20, dy: -20).contains(location)
-        }
+            return left < right
+        }?.index
     }
-}
 
-struct DropFramesKey: PreferenceKey {
-    static let defaultValue: [CardDropZone: CGRect] = [:]
-
-    static func reduce(
-        value: inout [CardDropZone: CGRect],
-        nextValue: () -> [CardDropZone: CGRect]
-    ) {
-        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    private static func distance(_ frame: CGRect, _ location: CGPoint) -> CGFloat {
+        let dx = frame.midX - location.x
+        let dy = frame.midY - location.y
+        return (dx * dx + dy * dy).squareRoot()
     }
 }
 
@@ -99,8 +172,31 @@ extension View {
         background(
             GeometryReader { proxy in
                 Color.clear.preference(
-                    key: DropFramesKey.self,
-                    value: [zone: proxy.frame(in: .named(TableSpace.name))]
+                    key: TableLayoutKey.self,
+                    value: TableLayout(
+                        zones: [zone: proxy.frame(in: .named(TableSpace.name))],
+                        handSlots: []
+                    )
+                )
+            }
+        )
+    }
+
+    func reportsHandSlot(index: Int, card: DraggedCard) -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: TableLayoutKey.self,
+                    value: TableLayout(
+                        zones: [:],
+                        handSlots: [
+                            HandSlot(
+                                index: index,
+                                card: card,
+                                frame: proxy.frame(in: .named(TableSpace.name))
+                            )
+                        ]
+                    )
                 )
             }
         )
@@ -158,6 +254,13 @@ private struct ScrollTouchPass: UIViewRepresentable {
 }
 
 extension CardFace {
+    func liftedForDrag() -> some View {
+        scaleEffect(1.08)
+            .shadow(color: .black.opacity(0.35), radius: 6, y: 6)
+    }
+}
+
+extension CardBack {
     func liftedForDrag() -> some View {
         scaleEffect(1.08)
             .shadow(color: .black.opacity(0.35), radius: 6, y: 6)

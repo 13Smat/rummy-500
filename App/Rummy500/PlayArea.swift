@@ -68,13 +68,28 @@ struct PlayArea: Equatable {
 
     private func layingOff(on index: Int, in hand: HandState) -> Result<HandState, TurnRejection> {
         var state = hand
-        for card in cards {
-            switch state.layOff(card, onMeldAt: index) {
-            case .failure(let reason):
-                return .failure(reason)
-            case .success(let next):
-                state = next
+        var pending = cards
+        while !pending.isEmpty {
+            var committedAt: Int?
+            var firstRefusal: TurnRejection?
+            for (offset, card) in pending.enumerated() {
+                switch state.layOff(card, onMeldAt: index) {
+                case .success(let next):
+                    state = next
+                    committedAt = offset
+                case .failure(let reason):
+                    if firstRefusal == nil {
+                        firstRefusal = reason
+                    }
+                }
+                if committedAt != nil {
+                    break
+                }
             }
+            guard let committedAt else {
+                return .failure(firstRefusal ?? .meldRejected(.doesNotFit))
+            }
+            pending.remove(at: committedAt)
         }
         return .success(state)
     }

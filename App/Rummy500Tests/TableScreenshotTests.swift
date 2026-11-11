@@ -23,9 +23,14 @@ final class TableScreenshotTests: XCTestCase {
         let picked = before.takeDiscard(buried)
         render(TablePage(session: picked), name: "play-deeper-pick", size: size)
         let other = picked.order.first { $0 != buried }
-        let blocked = picked.selecting(other.map { [$0] } ?? []).discardSelection()
+        let blocked = other.map { picked.receive(.discard(.hand($0))) } ?? picked
         render(TablePage(session: blocked), name: "play-must-use", size: size)
-        let refused = TableSession.opening(seed: 0, playsLive: false).layDownSelection()
+        let opening = TableSession.opening(seed: 0, playsLive: false)
+        render(TablePage(session: opening), name: "play-drawing-cue", size: size)
+        let drawn = opening.drawFromStock()
+        render(TablePage(session: drawn), name: "play-discard-cue", size: size)
+        render(TablePage(session: drawn), name: "play-button-free", size: size)
+        let refused = opening.playStaged()
         render(TablePage(session: refused), name: "play-refused", size: size)
         let computer = TableSession(preset: .midHand, playsLive: false).stepComputer()
         render(TablePage(session: computer), name: "play-computer", size: size)

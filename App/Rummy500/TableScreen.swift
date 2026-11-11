@@ -4,7 +4,7 @@ import SwiftUI
 struct TableScreen: View {
     @State private var session: TableSession
     @GestureState private var lift: CardLift?
-    @State private var zoneFrames: [CardDropZone: CGRect] = [:]
+    @State private var layout = TableLayout(zones: [:], handSlots: [])
 
     init(session: TableSession) {
         _session = State(initialValue: session)
@@ -49,7 +49,7 @@ struct TableScreen: View {
         .padding(.bottom, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .coordinateSpace(name: TableSpace.name)
-        .onPreferenceChange(DropFramesKey.self) { zoneFrames = $0 }
+        .onPreferenceChange(TableLayoutKey.self) { layout = $0 }
         .overlay { liftedCard }
         .task(id: session.beat) {
             guard session.computerPending else {
@@ -90,21 +90,10 @@ struct TableScreen: View {
             HStack(alignment: .center) {
                 score("You", scene.yourScore, identifier: "your-score")
                 Spacer(minLength: 8)
-                Text(scene.turnLabel)
-                    .font(.headline)
-                    .foregroundStyle(TableChrome.chipInk)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(TableChrome.chip, in: RoundedRectangle(cornerRadius: 8))
-                    .accessibilityIdentifier("turn")
+                turnChip(scene)
                 Spacer(minLength: 8)
                 score("Computer", scene.computerScore, identifier: "computer-score")
             }
-            Text(scene.phaseLabel)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("phase")
             if let mustUse = session.mustUseText {
                 banner(mustUse, identifier: "must-use")
             }
@@ -127,9 +116,27 @@ struct TableScreen: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("hand-result")
-                chip(session.nextHandTitle, id: "deal-next") {
-                    session = session.dealNextHand()
-                }
+            }
+        }
+    }
+
+    private func turnChip(_ scene: TableScene) -> some View {
+        let chip = Text(scene.turnLabel)
+            .font(.headline)
+            .foregroundStyle(TableChrome.chipInk)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(TableChrome.chip, in: RoundedRectangle(cornerRadius: 8))
+            .accessibilityIdentifier("turn")
+        return Group {
+            if let title = session.turnActionTitle {
+                chip
+                    .onTapGesture { session = session.tapTurn() }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction(named: title) { session = session.tapTurn() }
+                    .accessibilityLabel("\(scene.turnLabel). \(title)")
+            } else {
+                chip
             }
         }
     }
@@ -219,14 +226,9 @@ struct TableScreen: View {
             .scrollIndicators(.hidden)
             .frame(height: TableChrome.cardHeight + 28)
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            session = session.layOffSelection(onMeld: meld.id)
-        }
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("meld-\(meld.id)")
-        .accessibilityLabel("\(meld.kindLabel), lay off here")
+        .accessibilityLabel(meld.kindLabel)
     }
 
     private func meldCard(_ entry: TableMeldCard, in meld: TableMeld) -> some View {
@@ -252,54 +254,95 @@ struct TableScreen: View {
 
     private func piles(_ scene: TableScene) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Button {
-                session = session.drawFromStock()
-            } label: {
-                VStack(spacing: 4) {
-                    if scene.stockCount > 0 {
-                        CardBack()
-                            .accessibilityHidden(true)
-                    } else {
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(Color.white.opacity(0.7), lineWidth: 1)
-                            .frame(width: TableChrome.cardWidth, height: TableChrome.cardHeight)
-                    }
-                    Text("Stock \(scene.stockCount)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Stock, \(scene.stockCount) cards")
-            .accessibilityIdentifier("stock")
+            stockPile(scene)
+            discardPile(scene)
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Discard \(scene.discard.count)")
+    @ViewBuilder
+    private func stockPile(_ scene: TableScene) -> some View {
+        let stroke = pileStroke(.stock)
+        let button = Button {
+            session = session.tapStock()
+        } label: {
+            VStack(spacing: 4) {
+                if scene.stockCount > 0 {
+                    CardBack()
+                        .accessibilityHidden(true)
+                } else {
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(Color.white.opacity(0.7), lineWidth: 1)
+                        .frame(width: TableChrome.cardWidth, height: TableChrome.cardHeight)
+                }
+                Text("Stock \(scene.stockCount)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
-                    .accessibilityIdentifier("discard")
-                ScrollView(.horizontal) {
-                    HStack(spacing: TableChrome.discardStride - TableChrome.cardWidth) {
-                        ForEach(scene.discard, id: \.self) { card in
-                            Button {
-                                session = session.takeDiscard(card)
-                            } label: {
-                                CardFace(card: card)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel(CardLabel.spoken(card))
-                            .accessibilityIdentifier(TableCardID.discard(card))
-                            .accessibilityAddTraits(.isButton)
+            }
+            .padding(4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(stroke.color, lineWidth: stroke.width)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Stock, \(scene.stockCount) cards")
+        .accessibilityIdentifier("stock")
+        .accessibilityValue(session.cue.stockValue)
+        .accessibilityAction(named: session.stockActionTitle) {
+            session = session.tapStock()
+        }
+        if scene.stockCount > 0 {
+            button.tableCardDrag(DraggedCard.stock, lift: $lift) { payload, location in
+                finish(payload, at: location)
+            }
+        } else {
+            button
+        }
+    }
+
+    private func discardPile(_ scene: TableScene) -> some View {
+        let stroke = pileStroke(.discard)
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("Discard \(scene.discard.count)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .accessibilityIdentifier("discard")
+            ScrollView(.horizontal) {
+                HStack(spacing: TableChrome.discardStride - TableChrome.cardWidth) {
+                    ForEach(scene.discard, id: \.self) { card in
+                        Button {
+                            session = session.receive(.takeDiscard(.discard(card)))
+                        } label: {
+                            CardFace(card: card)
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(isLifted(DraggedCard.discard(card)) ? 0.35 : 1)
+                        .tableCardDrag(DraggedCard.discard(card), lift: $lift) { payload, location in
+                            finish(payload, at: location)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(CardLabel.spoken(card))
+                        .accessibilityIdentifier(TableCardID.discard(card))
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction(named: "Take discard") {
+                            session = session.receive(.takeDiscard(.discard(card)))
                         }
                     }
-                    .padding(.trailing, 2)
                 }
-                .scrollIndicators(.hidden)
-                .frame(height: TableChrome.cardHeight)
+                .padding(.trailing, 2)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .scrollIndicators(.hidden)
+            .frame(height: TableChrome.cardHeight)
         }
+        .padding(4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(stroke.color, lineWidth: stroke.width)
+        )
+        .reportsDropFrame(.discard)
+        .accessibilityElement(children: .contain)
+        .accessibilityValue(session.cue.discardValue)
     }
 
     private var playRow: some View {
@@ -316,10 +359,7 @@ struct TableScreen: View {
         ScrollView(.horizontal) {
             HStack(spacing: 6) {
                 if session.playArea.cards.isEmpty {
-                    Text("Drag cards here")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .frame(minHeight: TableChrome.cardHeight)
+                    Color.clear.frame(width: 8, height: TableChrome.cardHeight)
                 } else {
                     ForEach(session.playArea.cards, id: \.self) { card in
                         stagedCard(card)
@@ -371,6 +411,9 @@ struct TableScreen: View {
         .accessibilityAction(named: "Return to hand") {
             session = session.unstage(card)
         }
+        .accessibilityAction(named: "Discard") {
+            session = session.receive(.discard(.playArea(card)))
+        }
     }
 
     private var playButton: some View {
@@ -413,27 +456,51 @@ struct TableScreen: View {
 
     private var liftedCard: some View {
         Group {
-            if let lift, let card = lift.payload.card(in: session.order + session.playArea.cards) {
-                CardFace(card: card, mark: session.mark(for: card))
-                    .liftedForDrag()
-                    .position(lift.location)
-                    .allowsHitTesting(false)
+            if let lift {
+                if case .stock = lift.payload {
+                    CardBack()
+                        .liftedForDrag()
+                        .position(lift.location)
+                        .allowsHitTesting(false)
+                } else if let card = lift.payload.card(in: liftableCards) {
+                    CardFace(card: card, mark: session.mark(for: card))
+                        .liftedForDrag()
+                        .position(lift.location)
+                        .allowsHitTesting(false)
+                }
             }
         }
     }
 
+    private var liftableCards: [Card] {
+        session.order + session.playArea.cards + session.hand.discard.bottomToTop
+    }
+
     private func finish(_ payload: DraggedCard, at location: CGPoint) {
-        guard let zone = CardDragRoute.zone(for: payload, at: location, in: zoneFrames) else {
+        guard let drop = CardDragRoute.drop(payload, at: location, in: layout) else {
             return
         }
-        session = session.receive(payload, in: zone)
+        session = session.receive(drop)
     }
 
     private func zoneHighlighted(_ zone: CardDropZone) -> Bool {
-        guard let lift else {
+        guard let lift,
+              let drop = CardDragRoute.drop(lift.payload, at: lift.location, in: layout),
+              drop.zone == zone
+        else {
             return false
         }
-        return CardDragRoute.zone(for: lift.payload, at: lift.location, in: zoneFrames) == zone
+        return session.accepts(drop)
+    }
+
+    private func pileStroke(_ pile: TableCue.Pile) -> (color: Color, width: CGFloat) {
+        if pile == .discard, zoneHighlighted(.discard) {
+            return (.white, 3)
+        }
+        if session.cue.glows(pile) {
+            return (TableChrome.owed, 3)
+        }
+        return (Color.white.opacity(0.35), 1)
     }
 
     private func isLifted(_ payload: DraggedCard) -> Bool {
@@ -451,6 +518,7 @@ struct TableScreen: View {
                     ForEach(Array(scene.yourHand.enumerated()), id: \.element) { index, card in
                         handCard(card, in: scene.yourHand, index: index)
                     }
+                    .accessibilityIdentifier("card-row")
                 }
             }
             .scrollIndicators(.hidden)
@@ -468,10 +536,9 @@ struct TableScreen: View {
     }
 
     private func handCard(_ card: Card, in cards: [Card], index: Int) -> some View {
-        Button {
-            session = session.toggle(card)
-        } label: {
+        Button {} label: {
             CardFace(card: card, mark: session.mark(for: card))
+                .reportsHandSlot(index: index, card: DraggedCard.hand(card))
                 .padding(.leading, extraSuitGap(cards, index: index))
         }
         .buttonStyle(.plain)
@@ -483,12 +550,17 @@ struct TableScreen: View {
         .accessibilityLabel(handLabel(card))
         .accessibilityIdentifier(TableCardID.hand(card))
         .accessibilityAddTraits(.isButton)
-        .accessibilityAddTraits(session.selected.contains(card) ? .isSelected : [])
-        .accessibilityAction(named: "Select") {
-            session = session.toggle(card)
-        }
         .accessibilityAction(named: "Move to play area") {
             session = session.stage(card)
+        }
+        .accessibilityAction(named: "Discard") {
+            session = session.receive(.discard(.hand(card)))
+        }
+        .accessibilityAction(named: "Move left") {
+            session = session.nudge(card, by: -1)
+        }
+        .accessibilityAction(named: "Move right") {
+            session = session.nudge(card, by: 1)
         }
     }
 
@@ -502,28 +574,11 @@ struct TableScreen: View {
     private var actions: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
-                chip("Lay down", id: "lay-down") {
-                    session = session.layDownSelection()
-                }
-                chip("Discard", id: "discard-action") {
-                    session = session.discardSelection()
-                }
                 chip("By suit", id: "sort-suit", label: "Sort by suit") {
                     session = session.sortBySuit()
                 }
                 chip("By rank", id: "sort-rank", label: "Sort by rank") {
                     session = session.sortByRank()
-                }
-                chip("Move left", id: "move-left") {
-                    session = session.moveSelection(by: -1)
-                }
-                chip("Move right", id: "move-right") {
-                    session = session.moveSelection(by: 1)
-                }
-                if session.showsLeavePile {
-                    chip("Leave the pile", id: "leave-pile") {
-                        session = session.leaveThePile()
-                    }
                 }
             }
         }
@@ -593,8 +648,6 @@ struct CardFace: View {
         switch mark {
         case .plain:
             return Color.black.opacity(0.18)
-        case .selected:
-            return .white
         case .owed:
             return TableChrome.owed
         }
