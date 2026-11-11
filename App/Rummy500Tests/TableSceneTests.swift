@@ -115,13 +115,12 @@ final class TableSceneTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(TableChrome.minimumTap, 44)
         XCTAssertGreaterThan(TableChrome.minimumHandReveal, TableChrome.handCardWidth / 2)
 
-        let se: CGFloat = 375
-        let reveal = TableChrome.handReveal(count: 13, available: se)
+        let reveal = TableChrome.handReveal(count: 13, available: 375)
         XCTAssertGreaterThan(reveal, TableChrome.handCardWidth / 2)
-        XCTAssertLessThanOrEqual(TableChrome.fanWidth(count: 13, reveal: reveal), se + 0.5)
+        XCTAssertLessThanOrEqual(TableChrome.fanWidth(count: 13, reveal: reveal), 375.5)
 
-        let long = TableChrome.handReveal(count: 21, available: se)
+        let long = TableChrome.handReveal(count: 21, available: 375)
         XCTAssertGreaterThan(long, TableChrome.handCardWidth / 2)
-        XCTAssertGreaterThan(TableChrome.fanWidth(count: 21, reveal: long), se)
+        XCTAssertGreaterThan(TableChrome.fanWidth(count: 21, reveal: long), 375)
     }
 }

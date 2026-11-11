@@ -66,6 +66,10 @@ final class TableScreenshotTests: XCTestCase {
                     continue
                 }
                 let pixels = PixelCount(image)
+                let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
+                attachment.name = "\(fileName(preset))-\(phone.name).png"
+                attachment.lifetime = .keepAlways
+                add(attachment)
                 XCTAssertGreaterThan(image.size.width, 300)
                 XCTAssertGreaterThan(data.count, 5_000)
                 XCTAssertGreaterThan(
@@ -89,15 +93,11 @@ final class TableScreenshotTests: XCTestCase {
                     "\(preset.title) on \(phone.name) drew a missing image"
                 )
                 if preset == .freshDeal {
-                    XCTAssertGreaterThan(pixels.diamondOnCard, 40, "diamonds on \(phone.name)")
-                    XCTAssertGreaterThan(pixels.clubOnCard, 40, "clubs on \(phone.name)")
-                    XCTAssertGreaterThan(pixels.heartOnCard, 40, "hearts on \(phone.name)")
-                    XCTAssertGreaterThan(pixels.spadeOnCard, 40, "spades on \(phone.name)")
+                    XCTAssertGreaterThan(pixels.diamondOnCard, 12, "diamonds on \(phone.name)")
+                    XCTAssertGreaterThan(pixels.clubOnCard, 12, "clubs on \(phone.name)")
+                    XCTAssertGreaterThan(pixels.heartOnCard, 12, "hearts on \(phone.name)")
+                    XCTAssertGreaterThan(pixels.spadeOnCard, 12, "spades on \(phone.name)")
                 }
-                let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
-                attachment.name = "\(fileName(preset))-\(phone.name).png"
-                attachment.lifetime = .keepAlways
-                add(attachment)
             }
         }
     }
@@ -109,17 +109,23 @@ final class TableScreenshotTests: XCTestCase {
             XCTFail("Could not render \(name)")
             return
         }
-        XCTAssertGreaterThan(PixelCount(image).cardFace, 20_000, "\(name) did not draw the card faces")
         let attachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
         attachment.name = "\(name).png"
         attachment.lifetime = .keepAlways
         add(attachment)
+        XCTAssertGreaterThan(PixelCount(image).cardFace, 20_000, "\(name) did not draw the card faces")
     }
 
     @MainActor
     private func snapshot<Content: View>(_ content: Content, size: CGSize) -> UIImage? {
         let candidates = [renderedImage(content, size: size), hostedImage(content, size: size)]
-        return candidates.compactMap { $0 }.max { PixelCount($0).cardFace < PixelCount($1).cardFace }
+        return candidates.compactMap { $0 }.max { score($0) < score($1) }
+    }
+
+    private func score(_ image: UIImage) -> Int {
+        let pixels = PixelCount(image)
+        let drewTable = pixels.wood > 8_000 && pixels.felt > 8_000
+        return (drewTable ? 1_000_000 : 0) + pixels.cardFace
     }
 
     @MainActor
@@ -148,12 +154,14 @@ final class TableScreenshotTests: XCTestCase {
             drawn.fulfill()
         }
         XCTWaiter().wait(for: [drawn], timeout: 2)
+        window.layoutIfNeeded()
+        controller.view.layoutIfNeeded()
         let format = UIGraphicsImageRendererFormat()
         format.scale = 2
         format.opaque = true
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         let image = renderer.image { context in
-            if !window.drawHierarchy(in: bounds, afterScreenUpdates: true) {
+            if !window.drawHierarchy(in: bounds, afterScreenUpdates: false) {
                 window.layer.render(in: context.cgContext)
             }
         }

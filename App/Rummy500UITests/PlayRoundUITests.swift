@@ -37,7 +37,7 @@ final class PlayRoundUITests: XCTestCase {
         let computer = app.staticTexts["computer-line"]
         XCTAssertTrue(computer.waitForExistence(timeout: 8))
         XCTAssertFalse(computer.label.isEmpty)
-        XCTAssertEqual(turn.label, "Your turn")
+        waitUntilYourTurn(turn)
     }
 
     func testAFullTurnUsesOnlyDrags() {
@@ -70,7 +70,7 @@ final class PlayRoundUITests: XCTestCase {
         let computer = app.staticTexts["computer-line"]
         XCTAssertTrue(computer.waitForExistence(timeout: 8))
         XCTAssertFalse(computer.label.isEmpty)
-        XCTAssertEqual(turn.label, "Your turn")
+        waitUntilYourTurn(turn)
     }
 
     func testReorderingTheHandByDrag() {
@@ -151,5 +151,11 @@ final class PlayRoundUITests: XCTestCase {
 
     private func drag(_ card: XCUIElement, to area: XCUIElement) {
         card.press(forDuration: 0.8, thenDragTo: area, withVelocity: .slow, thenHoldForDuration: 0.4)
+    }
+
+    private func waitUntilYourTurn(_ turn: XCUIElement) {
+        let yours = NSPredicate(format: "label == %@", "Your turn")
+        wait(for: [expectation(for: yours, evaluatedWith: turn)], timeout: 8)
+        XCTAssertEqual(turn.label, "Your turn")
     }
 }

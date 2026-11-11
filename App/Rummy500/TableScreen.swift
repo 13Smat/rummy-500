@@ -16,31 +16,30 @@ struct TableScreen: View {
 
     var body: some View {
         let scene = session.scene
-        VStack(spacing: 0) {
-            topCluster(scene)
-            scorePill(
-                role: .opponent,
-                title: nil,
-                value: scene.computerScore,
-                identifier: "computer-score",
-                label: "Computer \(scene.computerScore)"
-            )
-            .padding(.top, 2)
-            .zIndex(1)
-            felt(scene)
-                .padding(.horizontal, 10)
-                .padding(.top, -12)
-                .frame(maxHeight: .infinity)
-            playerRow
-                .padding(.horizontal, 8)
-                .padding(.top, 6)
-            yourHand(scene)
+        ZStack {
+            WoodGrain()
+            VStack(spacing: 0) {
+                topCluster(scene)
+                scorePill(
+                    role: .opponent,
+                    title: nil,
+                    value: scene.computerScore,
+                    identifier: "computer-score",
+                    label: "Computer \(scene.computerScore)"
+                )
+                .padding(.top, 2)
+                .zIndex(1)
+                felt(scene)
+                    .padding(.horizontal, 10)
+                    .padding(.top, -12)
+                    .frame(maxHeight: .infinity)
+                playerRow
+                    .padding(.horizontal, 8)
+                    .padding(.top, 6)
+                yourHand(scene)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background {
-            WoodGrain()
-                .ignoresSafeArea()
-        }
         .coordinateSpace(name: TableSpace.name)
         .onPreferenceChange(TableLayoutKey.self) { layout = $0 }
         .overlay { liftedCard }

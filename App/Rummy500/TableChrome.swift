@@ -113,16 +113,21 @@ struct WoodGrain: View {
                 endPoint: .bottomTrailing
             )
             Canvas { context, size in
+                guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else {
+                    return
+                }
+                let width = min(size.width, 2000)
+                let height = min(size.height, 2000)
                 var y: CGFloat = -4
                 var row = 0
-                while y < size.height + 6 {
+                while y < height + 6, row < 400 {
                     var path = Path()
                     let bend = CGFloat(sin(Double(row) * 0.65)) * 6
                     path.move(to: CGPoint(x: -8, y: y))
                     path.addQuadCurve(
-                        to: CGPoint(x: size.width + 8, y: y + bend),
+                        to: CGPoint(x: width + 8, y: y + bend),
                         control: CGPoint(
-                            x: size.width * 0.45,
+                            x: width * 0.45,
                             y: y + CGFloat(sin(Double(row) * 0.37)) * 9
                         )
                     )
@@ -136,6 +141,7 @@ struct WoodGrain: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
