@@ -6,7 +6,6 @@ struct TableScreen: View {
     @State private var session: TableSession
     @GestureState private var lift: CardLift?
     @State private var layout = TableLayout(zones: [:], handSlots: [])
-    @State private var handWidth: CGFloat = 375
 
     init(session: TableSession) {
         _session = State(initialValue: session)
@@ -649,50 +648,43 @@ struct TableScreen: View {
     }
 
     private func yourHand(_ scene: TableScene) -> some View {
-        let cards = scene.yourHand
-        let available = tableHandWidth > 1 ? tableHandWidth : handWidth
-        let reveal = TableChrome.handReveal(count: cards.count, available: available)
-        let fan = TableChrome.fanWidth(count: cards.count, reveal: reveal)
-        let lead = max(0, (available - fan) / 2)
-        return VStack(alignment: .leading, spacing: 0) {
-            Text("Your hand \(cards.count)")
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Your hand \(scene.yourHand.count)")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.88))
                 .padding(.leading, 10)
                 .accessibilityIdentifier("your-hand")
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 0) {
-                    Color.clear.frame(width: lead)
-                    HStack(alignment: .top, spacing: reveal - TableChrome.handCardWidth) {
-                        ForEach(Array(cards.enumerated()), id: \.element) { index, card in
-                            handCard(card, index: index)
-                                .offset(y: TableChrome.handArc(index: index, count: cards.count))
-                                .zIndex(Double(index))
-                        }
-                    }
-                    Color.clear.frame(width: lead)
-                }
-                .frame(height: TableChrome.handCardHeight + 14, alignment: .top)
+            if tableHandWidth > 1 {
+                fan(scene.yourHand, width: tableHandWidth)
+            } else {
+                fan(scene.yourHand, width: UIScreen.main.bounds.width)
             }
-            .scrollIndicators(.hidden)
-            .frame(height: TableChrome.handCardHeight + 14)
         }
         .padding(.bottom, 4)
-        .background {
-            if tableHandWidth <= 1 {
-                GeometryReader { proxy in
-                    Color.clear.preference(key: HandWidthKey.self, value: proxy.size.width)
-                }
-            }
-        }
-        .onPreferenceChange(HandWidthKey.self) { width in
-            guard width > 1, abs(width - handWidth) > 0.5 else {
-                return
-            }
-            handWidth = width
-        }
         .reportsDropFrame(.hand)
         .animation(.easeOut(duration: 0.2), value: session.playArea.cards)
+    }
+
+    private func fan(_ cards: [Card], width available: CGFloat) -> some View {
+        let reveal = TableChrome.handReveal(count: cards.count, available: available)
+        let spread = TableChrome.fanWidth(count: cards.count, reveal: reveal)
+        let lead = max(0, (available - spread) / 2)
+        return ScrollView(.horizontal) {
+            HStack(alignment: .top, spacing: 0) {
+                Color.clear.frame(width: lead)
+                HStack(alignment: .top, spacing: reveal - TableChrome.handCardWidth) {
+                    ForEach(Array(cards.enumerated()), id: \.element) { index, card in
+                        handCard(card, index: index)
+                            .offset(y: TableChrome.handArc(index: index, count: cards.count))
+                            .zIndex(Double(index))
+                    }
+                }
+                Color.clear.frame(width: lead)
+            }
+            .frame(height: TableChrome.handCardHeight + 14, alignment: .top)
+        }
+        .scrollIndicators(.hidden)
+        .frame(height: TableChrome.handCardHeight + 14)
     }
 
     private func handCard(_ card: Card, index: Int) -> some View {
@@ -812,14 +804,6 @@ struct CardBack: View {
         .frame(width: width, height: height)
         .shadow(color: .black.opacity(0.22), radius: 1.2, y: 1)
         .accessibilityLabel(count.map { "Face-down card, \($0) left" } ?? "Face-down card")
-    }
-}
-
-private struct HandWidthKey: PreferenceKey {
-    static var defaultValue: CGFloat { 0 }
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
     }
 }
 
