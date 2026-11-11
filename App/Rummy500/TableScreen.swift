@@ -518,7 +518,6 @@ struct TableScreen: View {
                     ForEach(Array(scene.yourHand.enumerated()), id: \.element) { index, card in
                         handCard(card, in: scene.yourHand, index: index)
                     }
-                    .accessibilityIdentifier("card-row")
                 }
             }
             .scrollIndicators(.hidden)

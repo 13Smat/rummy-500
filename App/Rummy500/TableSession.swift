@@ -340,7 +340,7 @@ struct TableSession: Equatable {
         case .drawStock:
             return played(hand.drawFromStock())
         case .takeDiscard(let payload):
-            guard let card = payload.card(in: hand.discard.bottomToTop) else {
+            guard let card = payload.resolvedCard() else {
                 return .ignore
             }
             return played(hand.takeDiscard(card))

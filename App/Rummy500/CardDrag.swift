@@ -40,6 +40,26 @@ enum DraggedCard: Hashable, Codable, Sendable, Transferable {
         }
         return cards.first { $0.rank.rawValue == rank && CardLabel.letter($0.suit) == suit }
     }
+
+    func resolvedCard() -> Card? {
+        let rankValue: Int
+        let suitLetter: String
+        switch self {
+        case .hand(let value, let letter),
+             .playArea(let value, let letter),
+             .discard(let value, let letter):
+            rankValue = value
+            suitLetter = letter
+        case .stock:
+            return nil
+        }
+        guard let rank = Rank(rawValue: rankValue),
+              let suit = Suit.allCases.first(where: { CardLabel.letter($0) == suitLetter })
+        else {
+            return nil
+        }
+        return Card(rank: rank, suit: suit)
+    }
 }
 
 enum CardDropZone: Hashable {
