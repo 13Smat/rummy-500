@@ -101,55 +101,19 @@ struct CardMetrics: Equatable {
 }
 
 struct WoodGrain: View {
-    @Environment(\.tableSnapshot) private var tableSnapshot
-
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.64, green: 0.42, blue: 0.22),
-                    Color(red: 0.50, green: 0.30, blue: 0.15),
-                    Color(red: 0.58, green: 0.36, blue: 0.18),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            if !tableSnapshot {
-                grain
-            }
-        }
+        LinearGradient(
+            stops: [
+                .init(color: Color(red: 0.74, green: 0.50, blue: 0.28), location: 0),
+                .init(color: Color(red: 0.58, green: 0.34, blue: 0.16), location: 0.22),
+                .init(color: Color(red: 0.68, green: 0.42, blue: 0.22), location: 0.48),
+                .init(color: Color(red: 0.46, green: 0.26, blue: 0.12), location: 0.72),
+                .init(color: Color(red: 0.62, green: 0.36, blue: 0.18), location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var grain: some View {
-        Canvas { context, size in
-                guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else {
-                    return
-                }
-                let width = min(size.width, 2000)
-                let height = min(size.height, 2000)
-                var y: CGFloat = -4
-                var row = 0
-                while y < height + 6, row < 400 {
-                    var path = Path()
-                    let bend = CGFloat(sin(Double(row) * 0.65)) * 6
-                    path.move(to: CGPoint(x: -8, y: y))
-                    path.addQuadCurve(
-                        to: CGPoint(x: width + 8, y: y + bend),
-                        control: CGPoint(
-                            x: width * 0.45,
-                            y: y + CGFloat(sin(Double(row) * 0.37)) * 9
-                        )
-                    )
-                    let dark = row % 3 == 0
-                    let color = dark
-                        ? Color(red: 0.32, green: 0.17, blue: 0.07).opacity(0.22)
-                        : Color(red: 0.86, green: 0.70, blue: 0.44).opacity(0.12)
-                    context.stroke(path, with: .color(color), lineWidth: dark ? 2 : 1)
-                    y += 6
-                    row += 1
-                }
-        }
     }
 }
 

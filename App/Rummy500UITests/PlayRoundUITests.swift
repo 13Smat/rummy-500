@@ -153,6 +153,21 @@ final class PlayRoundUITests: XCTestCase {
         card.press(forDuration: 0.8, thenDragTo: area, withVelocity: .slow, thenHoldForDuration: 0.4)
     }
 
+    func testTheRestyledTableShowsItsControls() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let stock = app.buttons["stock"]
+        XCTAssertTrue(stock.waitForExistence(timeout: 15))
+        XCTAssertTrue(stock.label.contains("Stock"))
+        XCTAssertTrue(stock.label.contains("cards"))
+        XCTAssertTrue(app.descendants(matching: .any)["opponent-hand"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["discard"].exists)
+        XCTAssertTrue(app.buttons["sort"].exists)
+        XCTAssertTrue(app.buttons["clear-play"].exists)
+        XCTAssertTrue(app.buttons["play"].exists)
+    }
+
     private func waitUntilYourTurn(_ turn: XCUIElement) {
         let yours = NSPredicate(format: "label == %@", "Your turn")
         wait(for: [expectation(for: yours, evaluatedWith: turn)], timeout: 8)

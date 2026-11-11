@@ -18,7 +18,7 @@ Diamonds are blue, clubs are green, hearts are red, and spades are black. Each c
 
 ## Consequences
 
-Screenshot checks look for wood, felt, cream card faces, and all four suit inks on a fresh deal. A thirteen-card fan fits a 375-point width without covering a card's center. The gear and the trophy are still placeholders. The open questions in `docs/RULES.md` stay unanswered.
+The on-screen test requires the opponent fan, the stock count, the discard tray, Sort, X, and Play. The screenshot test saves a picture of each table state. A thirteen-card fan fits a 375-point width without covering a card's center. The gear and the trophy are still placeholders. The open questions in `docs/RULES.md` stay unanswered.
 
 ## Alternatives
 
