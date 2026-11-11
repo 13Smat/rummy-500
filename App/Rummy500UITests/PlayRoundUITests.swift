@@ -14,8 +14,11 @@ final class PlayRoundUITests: XCTestCase {
         XCTAssertFalse(app.buttons["move-left"].exists)
         XCTAssertFalse(app.buttons["move-right"].exists)
         XCTAssertFalse(app.buttons["leave-pile"].exists)
-        XCTAssertTrue(app.buttons["sort-suit"].exists)
-        XCTAssertTrue(app.buttons["sort-rank"].exists)
+        let sort = app.buttons["sort"]
+        XCTAssertTrue(sort.waitForExistence(timeout: 5))
+        XCTAssertEqual(sort.value as? String, "By suit")
+        XCTAssertFalse(app.buttons["sort-suit"].exists)
+        XCTAssertFalse(app.buttons["sort-rank"].exists)
         XCTAssertTrue(app.buttons["play"].exists)
         XCTAssertTrue(app.buttons["clear-play"].exists)
         XCTAssertEqual(app.buttons["stock"].value as? String, "Draw")
@@ -34,7 +37,7 @@ final class PlayRoundUITests: XCTestCase {
         let computer = app.staticTexts["computer-line"]
         XCTAssertTrue(computer.waitForExistence(timeout: 8))
         XCTAssertFalse(computer.label.isEmpty)
-        XCTAssertEqual(turn.label, "Your turn")
+        waitUntilYourTurn(turn)
     }
 
     func testAFullTurnUsesOnlyDrags() {
@@ -67,7 +70,7 @@ final class PlayRoundUITests: XCTestCase {
         let computer = app.staticTexts["computer-line"]
         XCTAssertTrue(computer.waitForExistence(timeout: 8))
         XCTAssertFalse(computer.label.isEmpty)
-        XCTAssertEqual(turn.label, "Your turn")
+        waitUntilYourTurn(turn)
     }
 
     func testReorderingTheHandByDrag() {
@@ -148,5 +151,26 @@ final class PlayRoundUITests: XCTestCase {
 
     private func drag(_ card: XCUIElement, to area: XCUIElement) {
         card.press(forDuration: 0.8, thenDragTo: area, withVelocity: .slow, thenHoldForDuration: 0.4)
+    }
+
+    func testTheRestyledTableShowsItsControls() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let stock = app.buttons["stock"]
+        XCTAssertTrue(stock.waitForExistence(timeout: 15))
+        XCTAssertTrue(stock.label.contains("Stock"))
+        XCTAssertTrue(stock.label.contains("cards"))
+        XCTAssertTrue(app.descendants(matching: .any)["opponent-hand"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["discard"].exists)
+        XCTAssertTrue(app.buttons["sort"].exists)
+        XCTAssertTrue(app.buttons["clear-play"].exists)
+        XCTAssertTrue(app.buttons["play"].exists)
+    }
+
+    private func waitUntilYourTurn(_ turn: XCUIElement) {
+        let yours = NSPredicate(format: "label == %@", "Your turn")
+        wait(for: [expectation(for: yours, evaluatedWith: turn)], timeout: 8)
+        XCTAssertEqual(turn.label, "Your turn")
     }
 }

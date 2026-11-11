@@ -11,6 +11,7 @@ struct TableSession: Equatable {
     private(set) var menuPreset: TablePreset?
     private(set) var computerPending: Bool
     private(set) var beat: Int
+    private(set) var handOrder: HandOrder
     let playsLive: Bool
     private var recordedThisHand: Bool
 
@@ -133,6 +134,7 @@ struct TableSession: Equatable {
         computerLine = nil
         recordedThisHand = false
         beat = 0
+        handOrder = .suit
         computerPending = false
         if playsLive, hand.turn == .computer, hand.handResult == nil {
             computerPending = true
@@ -249,12 +251,22 @@ struct TableSession: Equatable {
         }
     }
 
+    func toggleHandOrder() -> TableSession {
+        switch handOrder {
+        case .suit:
+            return sortByRank()
+        case .rank:
+            return sortBySuit()
+        }
+    }
+
     func sortBySuit() -> TableSession {
         if let blocked = gate() {
             return blocked
         }
         var copy = self
         copy.order = TableScene.sortedHand(order)
+        copy.handOrder = .suit
         copy.notice = nil
         return copy
     }
@@ -272,6 +284,7 @@ struct TableSession: Equatable {
             let right = Suit.allCases.firstIndex(of: rhs.suit) ?? 0
             return left < right
         }
+        copy.handOrder = .rank
         copy.notice = nil
         return copy
     }
@@ -457,6 +470,11 @@ struct TableSession: Equatable {
             }
         }
     }
+}
+
+enum HandOrder: Equatable {
+    case suit
+    case rank
 }
 
 enum CardMark: Equatable {

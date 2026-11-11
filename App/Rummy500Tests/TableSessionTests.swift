@@ -154,7 +154,12 @@ final class TableSessionTests: XCTestCase {
         XCTAssertEqual(byRank.hand.you.cards, dealtCards)
 
         let bySuit = byRank.sortBySuit()
+        XCTAssertEqual(bySuit.handOrder, .suit)
         XCTAssertEqual(bySuit.order, TableScene.sortedHand(dealtCards))
+        let toggled = dealt.toggleHandOrder()
+        XCTAssertEqual(toggled.handOrder, .rank)
+        XCTAssertEqual(toggled.order, byRank.order)
+        XCTAssertEqual(toggled.toggleHandOrder().order, bySuit.order)
         let first = bySuit.order[0]
         let moved = bySuit.nudge(first, by: 1)
         XCTAssertEqual(moved.order[1], first)
