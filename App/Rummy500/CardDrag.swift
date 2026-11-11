@@ -84,7 +84,7 @@ enum CardDragRoute {
 }
 
 struct DropFramesKey: PreferenceKey {
-    static var defaultValue: [CardDropZone: CGRect] = [:]
+    static let defaultValue: [CardDropZone: CGRect] = [:]
 
     static func reduce(
         value: inout [CardDropZone: CGRect],
