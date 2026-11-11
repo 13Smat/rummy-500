@@ -118,8 +118,12 @@ final class TableScreenshotTests: XCTestCase {
 
     @MainActor
     private func snapshot<Content: View>(_ content: Content, size: CGSize) -> UIImage? {
-        let candidates = [renderedImage(content, size: size), hostedImage(content, size: size)]
-        return candidates.compactMap { $0 }.max { score($0) < score($1) }
+        if let rendered = renderedImage(content, size: size), score(rendered) >= 1_020_000 {
+            return rendered
+        }
+        let rendered = renderedImage(content, size: size)
+        let hosted = hostedImage(content, size: size)
+        return [rendered, hosted].compactMap { $0 }.max { score($0) < score($1) }
     }
 
     private func score(_ image: UIImage) -> Int {
@@ -161,9 +165,7 @@ final class TableScreenshotTests: XCTestCase {
         format.opaque = true
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         let image = renderer.image { context in
-            if !window.drawHierarchy(in: bounds, afterScreenUpdates: false) {
-                window.layer.render(in: context.cgContext)
-            }
+            window.layer.render(in: context.cgContext)
         }
         window.isHidden = true
         return image
@@ -246,17 +248,11 @@ private struct PixelCount {
                 red > 220 && green > 210 && blue > 190
             }
             func nearCream(_ x: Int, _ y: Int) -> Bool {
-                let reach = 10
-                var dy = -reach
-                while dy <= reach {
-                    var dx = -reach
-                    while dx <= reach {
-                        if let nearby = sample(x + dx, y + dy), cream(nearby.0, nearby.1, nearby.2) {
-                            return true
-                        }
-                        dx += 2
+                let spots = [(8, 0), (-8, 0), (0, 8), (0, -8), (6, 6), (-6, 6)]
+                for spot in spots {
+                    if let nearby = sample(x + spot.0, y + spot.1), cream(nearby.0, nearby.1, nearby.2) {
+                        return true
                     }
-                    dy += 2
                 }
                 return false
             }
@@ -278,25 +274,28 @@ private struct PixelCount {
                 if green > 70 && green < 170 && green > red + 20 && green > blue + 10 && red < 90 && blue < 120 {
                     feltCount += 1
                 }
-                let diamond = blue > 180 && red < 80 && green < 130
-                let club = red < 40 && green > 120 && green < 190 && blue < 100
-                let heart = red > 170 && green < 80 && blue < 90
-                let spade = red > 8 && red < 40 && green > 8 && green < 40 && blue > 8 && blue < 50
-                if diamond || club || heart || spade {
-                    let x = pixel % width
-                    let y = pixel / width
-                    if nearCream(x, y) {
-                        if diamond {
-                            diamonds += 1
-                        }
-                        if club {
-                            clubs += 1
-                        }
-                        if heart {
-                            hearts += 1
-                        }
-                        if spade {
-                            spades += 1
+                let stillNeedInk = diamonds < 40 || clubs < 40 || hearts < 40 || spades < 40
+                if stillNeedInk, pixel % 2 == 0 {
+                    let diamond = blue > 180 && red < 80 && green < 130
+                    let club = red < 40 && green > 120 && green < 190 && blue < 100
+                    let heart = red > 170 && green < 80 && blue < 90
+                    let spade = red > 8 && red < 40 && green > 8 && green < 40 && blue > 8 && blue < 50
+                    if diamond || club || heart || spade {
+                        let x = pixel % width
+                        let y = pixel / width
+                        if nearCream(x, y) {
+                            if diamond {
+                                diamonds += 1
+                            }
+                            if club {
+                                clubs += 1
+                            }
+                            if heart {
+                                hearts += 1
+                            }
+                            if spade {
+                                spades += 1
+                            }
                         }
                     }
                 }

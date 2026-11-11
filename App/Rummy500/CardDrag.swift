@@ -194,7 +194,7 @@ extension View {
                 Color.clear.preference(
                     key: TableLayoutKey.self,
                     value: TableLayout(
-                        zones: [zone: proxy.frame(in: .named(TableSpace.name))],
+                        zones: [zone: proxy.frame(in: .named(TableSpace.name)).integral],
                         handSlots: []
                     )
                 )
@@ -213,7 +213,7 @@ extension View {
                             HandSlot(
                                 index: index,
                                 card: card,
-                                frame: proxy.frame(in: .named(TableSpace.name))
+                                frame: proxy.frame(in: .named(TableSpace.name)).integral
                             )
                         ]
                     )
