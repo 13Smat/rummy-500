@@ -189,37 +189,11 @@ enum CardDragRoute {
 
 extension View {
     func reportsDropFrame(_ zone: CardDropZone) -> some View {
-        background(
-            GeometryReader { proxy in
-                Color.clear.preference(
-                    key: TableLayoutKey.self,
-                    value: TableLayout(
-                        zones: [zone: proxy.frame(in: .named(TableSpace.name)).integral],
-                        handSlots: []
-                    )
-                )
-            }
-        )
+        modifier(DropFrameReporter(zone: zone))
     }
 
     func reportsHandSlot(index: Int, card: DraggedCard) -> some View {
-        background(
-            GeometryReader { proxy in
-                Color.clear.preference(
-                    key: TableLayoutKey.self,
-                    value: TableLayout(
-                        zones: [:],
-                        handSlots: [
-                            HandSlot(
-                                index: index,
-                                card: card,
-                                frame: proxy.frame(in: .named(TableSpace.name)).integral
-                            )
-                        ]
-                    )
-                )
-            }
-        )
+        modifier(HandSlotReporter(index: index, card: card))
     }
 
     func tableCardDrag(
@@ -255,6 +229,58 @@ private struct TableCardDrag: ViewModifier {
     }
 }
 
+private struct DropFrameReporter: ViewModifier {
+    var zone: CardDropZone
+    @Environment(\.tableSnapshot) private var tableSnapshot
+
+    func body(content: Content) -> some View {
+        if tableSnapshot {
+            content
+        } else {
+            content.background(
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: TableLayoutKey.self,
+                        value: TableLayout(
+                            zones: [zone: proxy.frame(in: .named(TableSpace.name)).integral],
+                            handSlots: []
+                        )
+                    )
+                }
+            )
+        }
+    }
+}
+
+private struct HandSlotReporter: ViewModifier {
+    var index: Int
+    var card: DraggedCard
+    @Environment(\.tableSnapshot) private var tableSnapshot
+
+    func body(content: Content) -> some View {
+        if tableSnapshot {
+            content
+        } else {
+            content.background(
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: TableLayoutKey.self,
+                        value: TableLayout(
+                            zones: [:],
+                            handSlots: [
+                                HandSlot(
+                                    index: index,
+                                    card: card,
+                                    frame: proxy.frame(in: .named(TableSpace.name)).integral
+                                )
+                            ]
+                        )
+                    )
+                }
+            )
+        }
+    }
+}
 private struct ScrollTouchPass: UIViewRepresentable {
     func makeUIView(context: Context) -> PassView {
         PassView()

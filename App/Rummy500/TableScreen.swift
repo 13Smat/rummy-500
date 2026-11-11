@@ -43,7 +43,11 @@ struct TableScreen: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .coordinateSpace(name: TableSpace.name)
-        .onPreferenceChange(TableLayoutKey.self) { layout = $0 }
+        .onPreferenceChange(TableLayoutKey.self) { next in
+            if next != layout {
+                layout = next
+            }
+        }
         .overlay { liftedCard }
         .task(id: session.beat) {
             guard session.computerPending else {

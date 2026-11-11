@@ -135,7 +135,7 @@ final class TableScreenshotTests: XCTestCase {
         renderer.scale = 2
         renderer.proposedSize = ProposedViewSize(width: size.width, height: size.height)
         let image = renderer.uiImage
-        print("table snapshot end \(Int(image?.size.width ?? 0))")
+        print("table snapshot end \(Int(image?.size.width ?? 0))x\(Int(image?.size.height ?? 0))")
         return image
     }
 
