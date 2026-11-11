@@ -5,7 +5,6 @@ struct TableSession: Equatable {
     private(set) var hand: HandState
     private(set) var match: Match
     private(set) var order: [Card]
-    private(set) var selected: [Card]
     private(set) var playArea: PlayArea
     private(set) var notice: String?
     private(set) var computerLine: String?
@@ -75,8 +74,29 @@ struct TableSession: Equatable {
         hand.handResult != nil
     }
 
-    var showsLeavePile: Bool {
-        hand.turn == .you && hand.stock.count == 0 && hand.phase == .awaitingDraw
+    var cue: TableCue {
+        if hand.handResult != nil {
+            return .handOver
+        }
+        guard hand.turn == .you else {
+            return .none
+        }
+        switch hand.phase {
+        case .awaitingDraw:
+            return hand.stock.count == 0 ? .pass : .draw
+        case .mayMeldOrDiscard:
+            return .discard
+        case .mustUsePickedCard(_), .handOver(_):
+            return .none
+        }
+    }
+
+    var stockActionTitle: String {
+        cue == .pass ? "Leave the pile" : "Draw"
+    }
+
+    var turnActionTitle: String? {
+        cue == .handOver ? nextHandTitle : nil
     }
 
     static func opening(seed: UInt64, playsLive: Bool) -> TableSession {
@@ -108,7 +128,6 @@ struct TableSession: Equatable {
         self.playsLive = playsLive
         self.menuPreset = menuPreset
         order = TableScene.sortedHand(hand.you.cards)
-        selected = []
         playArea = PlayArea(cards: [])
         notice = nil
         computerLine = nil
@@ -122,93 +141,76 @@ struct TableSession: Equatable {
     }
 
     func drawFromStock() -> TableSession {
-        if let blocked = gate() {
-            return blocked
-        }
-        return applying(hand.drawFromStock())
+        receive(.drawStock)
     }
 
     func takeDiscard(_ card: Card) -> TableSession {
-        if let blocked = gate() {
-            return blocked
-        }
-        return applying(hand.takeDiscard(card))
+        receive(.takeDiscard(.discard(card)))
     }
 
-    func leaveThePile() -> TableSession {
-        if let blocked = gate() {
-            return blocked
+    func tapStock() -> TableSession {
+        if cue == .pass {
+            return declining()
         }
-        return applying(hand.declineDiscardPile())
+        return receive(.drawStock)
     }
 
-    func layDownSelection() -> TableSession {
-        if let blocked = gate() {
-            return blocked
+    func tapTurn() -> TableSession {
+        guard cue == .handOver else {
+            return self
         }
-        if selected.isEmpty {
-            return refusing("Select the cards you want to lay down.")
-        }
-        return applying(hand.layDown(selected))
-    }
-
-    func layOffSelection(onMeld index: Int) -> TableSession {
-        if let blocked = gate() {
-            return blocked
-        }
-        switch selected.count {
-        case 0:
-            return refusing("Select one card, then tap the meld.")
-        case 1:
-            return applying(hand.layOff(selected[0], onMeldAt: index))
-        default:
-            return refusing("Lay off one card at a time.")
-        }
-    }
-
-    func discardSelection() -> TableSession {
-        if let blocked = gate() {
-            return blocked
-        }
-        switch selected.count {
-        case 0:
-            return refusing("Select the one card you want to discard.")
-        case 1:
-            return applying(hand.discard(selected[0]))
-        default:
-            return refusing("Discard one card.")
-        }
+        return dealNextHand()
     }
 
     func stage(_ card: Card) -> TableSession {
-        if let blocked = gate() {
-            return blocked
-        }
-        guard let index = order.firstIndex(of: card), !playArea.cards.contains(card) else {
-            return self
-        }
-        var copy = self
-        copy.order.remove(at: index)
-        copy.selected.removeAll { $0 == card }
-        copy.playArea = copy.playArea.adding(card)
-        copy.notice = nil
-        return copy
+        receive(.stage(.hand(card)))
     }
 
     func unstage(_ card: Card) -> TableSession {
+        receive(.placeInHand(.playArea(card), at: order.count))
+    }
+
+    func receive(_ drop: CardDrop) -> TableSession {
         if let blocked = gate() {
             return blocked
         }
-        guard playArea.cards.contains(card) else {
+        switch effect(drop) {
+        case .hand(let next):
+            return applying(.success(next))
+        case .arranged(let order, let playArea):
+            var copy = self
+            copy.order = order
+            copy.playArea = playArea
+            copy.notice = nil
+            return copy
+        case .refuse(let text):
+            return refusing(text)
+        case .ignore:
             return self
         }
-        var copy = self
-        copy.playArea = copy.playArea.removing(card)
-        if !copy.order.contains(card) {
-            copy.order.append(card)
+    }
+
+    func accepts(_ drop: CardDrop) -> Bool {
+        guard hand.turn == .you, hand.handResult == nil else {
+            return false
         }
-        copy.notice = nil
-        return copy
+        switch effect(drop) {
+        case .hand, .arranged:
+            return true
+        case .refuse, .ignore:
+            return false
+        }
+    }
+
+    func nudge(_ card: Card, by delta: Int) -> TableSession {
+        guard let index = order.firstIndex(of: card) else {
+            return self
+        }
+        let target = index + delta
+        guard order.indices.contains(target) else {
+            return self
+        }
+        return receive(.placeInHand(.hand(card), at: target))
     }
 
     func clearPlayArea() -> TableSession {
@@ -247,43 +249,6 @@ struct TableSession: Equatable {
         }
     }
 
-    func receive(_ drag: DraggedCard, in zone: CardDropZone) -> TableSession {
-        let pool = order + playArea.cards
-        guard let card = drag.card(in: pool) else {
-            return self
-        }
-        switch CardDragRoute.intent(origin: drag.origin, zone: zone) {
-        case .stage:
-            return stage(card)
-        case .unstage:
-            return unstage(card)
-        case nil:
-            return self
-        }
-    }
-
-    func toggle(_ card: Card) -> TableSession {
-        if let blocked = gate() {
-            return blocked
-        }
-        guard order.contains(card) else {
-            return self
-        }
-        var copy = self
-        if let index = copy.selected.firstIndex(of: card) {
-            copy.selected.remove(at: index)
-        } else {
-            copy.selected.append(card)
-        }
-        return copy
-    }
-
-    func selecting(_ cards: [Card]) -> TableSession {
-        var copy = self
-        copy.selected = cards.filter { copy.order.contains($0) }
-        return copy
-    }
-
     func sortBySuit() -> TableSession {
         if let blocked = gate() {
             return blocked
@@ -307,27 +272,6 @@ struct TableSession: Equatable {
             let right = Suit.allCases.firstIndex(of: rhs.suit) ?? 0
             return left < right
         }
-        copy.notice = nil
-        return copy
-    }
-
-    func moveSelection(by delta: Int) -> TableSession {
-        if let blocked = gate() {
-            return blocked
-        }
-        guard let card = selected.first, let index = order.firstIndex(of: card) else {
-            return refusing("Select a card to move.")
-        }
-        let target = index + delta
-        guard order.indices.contains(target) else {
-            if delta < 0 {
-                return refusing("That card is already at the start of the hand.")
-            }
-            return refusing("That card is already at the end of the hand.")
-        }
-        var copy = self
-        copy.order.remove(at: index)
-        copy.order.insert(card, at: target)
         copy.notice = nil
         return copy
     }
@@ -358,7 +302,7 @@ struct TableSession: Equatable {
         }
     }
 
-    func dealNextHand() -> TableSession {
+    private func dealNextHand() -> TableSession {
         guard let result = hand.handResult else {
             return refusing("This hand is still going.")
         }
@@ -381,13 +325,82 @@ struct TableSession: Equatable {
     }
 
     func mark(for card: Card) -> CardMark {
-        if card == owedCard {
-            return .owed
+        card == owedCard ? .owed : .plain
+    }
+
+    private func declining() -> TableSession {
+        if let blocked = gate() {
+            return blocked
         }
-        if selected.contains(card) {
-            return .selected
+        return applying(hand.declineDiscardPile())
+    }
+
+    private func effect(_ drop: CardDrop) -> DropEffect {
+        switch drop {
+        case .drawStock:
+            return played(hand.drawFromStock())
+        case .takeDiscard(let payload):
+            guard let card = payload.resolvedCard() else {
+                return .ignore
+            }
+            return played(hand.takeDiscard(card))
+        case .discard(let payload):
+            return discarding(payload)
+        case .stage(let payload):
+            return staging(payload)
+        case .placeInHand(let payload, let index):
+            return placing(payload, at: index)
         }
-        return .plain
+    }
+
+    private func played(_ result: Result<HandState, TurnRejection>) -> DropEffect {
+        switch result {
+        case .success(let next):
+            return .hand(next)
+        case .failure(let reason):
+            return .refuse(TurnWords.saying(reason))
+        }
+    }
+
+    private func discarding(_ payload: DraggedCard) -> DropEffect {
+        let pool = order + playArea.cards
+        guard let card = payload.card(in: pool) else {
+            return .ignore
+        }
+        if playArea.cards.contains(card), playArea.cards.count != 1 {
+            return .refuse("Discard one card.")
+        }
+        return played(hand.discard(card))
+    }
+
+    private func staging(_ payload: DraggedCard) -> DropEffect {
+        guard let card = payload.card(in: order), !playArea.cards.contains(card) else {
+            return .ignore
+        }
+        var next = order
+        next.removeAll { $0 == card }
+        return .arranged(order: next, playArea: playArea.adding(card))
+    }
+
+    private func placing(_ payload: DraggedCard, at finalIndex: Int) -> DropEffect {
+        let pool = order + playArea.cards
+        guard let card = payload.card(in: pool) else {
+            return .ignore
+        }
+        if let current = order.firstIndex(of: card) {
+            var next = order
+            next.remove(at: current)
+            let index = min(max(finalIndex, 0), next.count)
+            next.insert(card, at: index)
+            return .arranged(order: next, playArea: playArea)
+        }
+        guard playArea.cards.contains(card) else {
+            return .ignore
+        }
+        var next = order
+        let index = min(max(finalIndex, 0), next.count)
+        next.insert(card, at: index)
+        return .arranged(order: next, playArea: playArea.removing(card))
     }
 
     private func gate() -> TableSession? {
@@ -435,7 +448,6 @@ struct TableSession: Equatable {
         let kept = order.filter { visible.contains($0) }
         let extras = visible.filter { !kept.contains($0) }
         order = kept + extras
-        selected = selected.filter { order.contains($0) }
         hand = next
         if let result = next.handResult, !recordedThisHand, case .playing = match.conclusion {
             match = match.record(result)
@@ -449,8 +461,60 @@ struct TableSession: Equatable {
 
 enum CardMark: Equatable {
     case plain
-    case selected
     case owed
+}
+
+enum TableCue: Equatable {
+    case none
+    case draw
+    case pass
+    case discard
+    case handOver
+
+    func glows(_ pile: Pile) -> Bool {
+        switch (self, pile) {
+        case (.draw, _), (.pass, _):
+            return true
+        case (.discard, .discard):
+            return true
+        default:
+            return false
+        }
+    }
+
+    var stockValue: String {
+        switch self {
+        case .draw:
+            return "Draw"
+        case .pass:
+            return "Leave the pile"
+        case .discard, .none, .handOver:
+            return ""
+        }
+    }
+
+    var discardValue: String {
+        switch self {
+        case .draw, .pass:
+            return "Draw"
+        case .discard:
+            return "Discard"
+        case .none, .handOver:
+            return ""
+        }
+    }
+
+    enum Pile: Equatable {
+        case stock
+        case discard
+    }
+}
+
+private enum DropEffect: Equatable {
+    case hand(HandState)
+    case arranged(order: [Card], playArea: PlayArea)
+    case refuse(String)
+    case ignore
 }
 
 enum TableCardID {

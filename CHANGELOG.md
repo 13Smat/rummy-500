@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Drag the stock into your hand to draw, drag a discard into your hand to take it, and drag one card onto the discard pile to discard. Drag a card to a new place in your hand. Lay down, Discard, and Move left and Move right are gone. Sort by suit, sort by rank, X, and Play remain. The stock and the discard glow for the move you need, and a layoff plays the card the engine can take first.
 - Drag cards into the play area to build a meld. Play stays visible and turns on when those cards are a legal meld or a layoff onto one meld. X sends them back to your hand. VoiceOver can move a card in or out without a drag.
 - The TestFlight archive is unsigned. Export signs it for App Store distribution, so the upload does not need a registered device.
 - The TestFlight archive command does not pass a signing identity. A distribution identity on that command conflicted with the app target and with the RummyEngine package.

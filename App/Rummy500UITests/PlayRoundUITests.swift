@@ -9,28 +9,83 @@ final class PlayRoundUITests: XCTestCase {
         let turn = app.staticTexts["turn"]
         XCTAssertTrue(turn.waitForExistence(timeout: 15))
         XCTAssertEqual(turn.label, "Your turn")
+        XCTAssertFalse(app.buttons["lay-down"].exists)
+        XCTAssertFalse(app.buttons["discard-action"].exists)
+        XCTAssertFalse(app.buttons["move-left"].exists)
+        XCTAssertFalse(app.buttons["move-right"].exists)
+        XCTAssertFalse(app.buttons["leave-pile"].exists)
+        XCTAssertTrue(app.buttons["sort-suit"].exists)
+        XCTAssertTrue(app.buttons["sort-rank"].exists)
+        XCTAssertTrue(app.buttons["play"].exists)
+        XCTAssertTrue(app.buttons["clear-play"].exists)
+        XCTAssertEqual(app.buttons["stock"].value as? String, "Draw")
 
-        let hand = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "hand-"))
-        XCTAssertTrue(hand.element(boundBy: 0).waitForExistence(timeout: 5))
-        hand.element(boundBy: 0).tap()
-        app.buttons["discard-action"].tap()
-
+        let nine = app.buttons["hand-9-C"]
+        let pile = app.buttons["discard-8-D"]
+        XCTAssertTrue(nine.waitForExistence(timeout: 5))
+        drag(nine, to: pile)
         let notice = app.staticTexts["notice"]
         XCTAssertTrue(notice.waitForExistence(timeout: 3))
         XCTAssertEqual(notice.label, "Draw a card before you play.")
 
-        app.buttons["stock"].tap()
-        XCTAssertEqual(app.staticTexts["phase"].label, "Meld or discard")
-        app.buttons["discard-action"].tap()
+        drag(app.buttons["stock"], to: nine)
+        drag(nine, to: pile)
 
-        // The discard tap waits for the app to settle. The computer's pauses
-        // finish during that wait, so the turn is already back, and the line
-        // it left is the record of the turn.
         let computer = app.staticTexts["computer-line"]
         XCTAssertTrue(computer.waitForExistence(timeout: 8))
         XCTAssertFalse(computer.label.isEmpty)
         XCTAssertEqual(turn.label, "Your turn")
-        XCTAssertEqual(app.staticTexts["phase"].label, "Draw a card")
+    }
+
+    func testAFullTurnUsesOnlyDrags() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-tableSeed", "11"]
+        app.launch()
+
+        let play = app.buttons["play"]
+        XCTAssertTrue(play.waitForExistence(timeout: 15))
+        let two = app.buttons["hand-2-C"]
+        let three = app.buttons["hand-3-C"]
+        let four = app.buttons["hand-4-C"]
+        XCTAssertTrue(two.waitForExistence(timeout: 5))
+        drag(app.buttons["stock"], to: two)
+        XCTAssertTrue(playArea(app).waitForExistence(timeout: 5))
+        drag(two, to: playArea(app))
+        drag(three, to: playArea(app))
+        drag(four, to: playArea(app))
+        let enabled = NSPredicate(format: "isEnabled == true")
+        wait(for: [expectation(for: enabled, evaluatedWith: play)], timeout: 5)
+        play.tap()
+
+        let meld = app.descendants(matching: .any)["meld-0"]
+        XCTAssertTrue(meld.waitForExistence(timeout: 5))
+        XCTAssertTrue(meld.label.contains("Run"))
+        XCTAssertFalse(app.buttons["hand-2-C"].exists)
+        drag(app.buttons["hand-2-D"], to: app.buttons["discard-1-D"])
+
+        let turn = app.staticTexts["turn"]
+        let computer = app.staticTexts["computer-line"]
+        XCTAssertTrue(computer.waitForExistence(timeout: 8))
+        XCTAssertFalse(computer.label.isEmpty)
+        XCTAssertEqual(turn.label, "Your turn")
+    }
+
+    func testReorderingTheHandByDrag() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let nine = app.buttons["hand-9-C"]
+        let two = app.buttons["hand-2-D"]
+        XCTAssertTrue(nine.waitForExistence(timeout: 15))
+        XCTAssertTrue(two.waitForExistence(timeout: 5))
+        drag(nine, to: two)
+
+        let hand = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "hand-"))
+        let shown = expectation(for: NSPredicate(format: "identifier == %@", "hand-11-C"), evaluatedWith: hand.element(boundBy: 0))
+        wait(for: [shown], timeout: 5)
+        XCTAssertEqual(hand.element(boundBy: 0).identifier, "hand-11-C")
+        XCTAssertEqual(hand.element(boundBy: 1).identifier, "hand-2-D")
+        XCTAssertEqual(hand.element(boundBy: 2).identifier, "hand-9-C")
     }
 
     func testLongDiscardShowsTheCardYouMustPlay() {
@@ -80,6 +135,7 @@ final class PlayRoundUITests: XCTestCase {
         XCTAssertFalse(app.buttons["hand-7-H"].exists)
         XCTAssertFalse(app.buttons["play-7-H"].exists)
         XCTAssertEqual(app.descendants(matching: .any)["your-score"].label, "You 0")
+        XCTAssertFalse(app.buttons["meld-0"].exists)
     }
 
     private func playArea(_ app: XCUIApplication) -> XCUIElement {
