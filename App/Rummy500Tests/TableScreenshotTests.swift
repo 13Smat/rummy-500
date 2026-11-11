@@ -118,27 +118,25 @@ final class TableScreenshotTests: XCTestCase {
 
     @MainActor
     private func snapshot<Content: View>(_ content: Content, size: CGSize) -> UIImage? {
-        if let rendered = renderedImage(content, size: size), score(rendered) >= 1_020_000 {
+        if let rendered = renderedImage(content, size: size) {
             return rendered
         }
-        let rendered = renderedImage(content, size: size)
-        let hosted = hostedImage(content, size: size)
-        return [rendered, hosted].compactMap { $0 }.max { score($0) < score($1) }
-    }
-
-    private func score(_ image: UIImage) -> Int {
-        let pixels = PixelCount(image)
-        let drewTable = pixels.wood > 8_000 && pixels.felt > 8_000
-        return (drewTable ? 1_000_000 : 0) + pixels.cardFace
+        return hostedImage(content, size: size)
     }
 
     @MainActor
     private func renderedImage<Content: View>(_ content: Content, size: CGSize) -> UIImage? {
-        let page = content.frame(width: size.width, height: size.height)
+        let page = content
+            .environment(\.tableSnapshot, true)
+            .environment(\.tableHandWidth, size.width)
+            .frame(width: size.width, height: size.height)
+        print("table snapshot start \(Int(size.width))x\(Int(size.height))")
         let renderer = ImageRenderer(content: page)
         renderer.scale = 2
         renderer.proposedSize = ProposedViewSize(width: size.width, height: size.height)
-        return renderer.uiImage
+        let image = renderer.uiImage
+        print("table snapshot end \(Int(image?.size.width ?? 0))")
+        return image
     }
 
     @MainActor

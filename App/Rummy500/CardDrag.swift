@@ -227,16 +227,31 @@ extension View {
         lift: GestureState<CardLift?>,
         onDrop: @escaping (DraggedCard, CGPoint) -> Void
     ) -> some View {
-        background(ScrollTouchPass())
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 8, coordinateSpace: .named(TableSpace.name))
-                    .updating(lift) { value, state, _ in
-                        state = CardLift(payload: payload, location: value.location)
-                    }
-                    .onEnded { value in
-                        onDrop(payload, value.location)
-                    }
-            )
+        modifier(TableCardDrag(payload: payload, lift: lift, onDrop: onDrop))
+    }
+}
+
+private struct TableCardDrag: ViewModifier {
+    var payload: DraggedCard
+    var lift: GestureState<CardLift?>
+    var onDrop: (DraggedCard, CGPoint) -> Void
+    @Environment(\.tableSnapshot) private var tableSnapshot
+
+    func body(content: Content) -> some View {
+        let dragged = content.highPriorityGesture(
+            DragGesture(minimumDistance: 8, coordinateSpace: .named(TableSpace.name))
+                .updating(lift) { value, state, _ in
+                    state = CardLift(payload: payload, location: value.location)
+                }
+                .onEnded { value in
+                    onDrop(payload, value.location)
+                }
+        )
+        if tableSnapshot {
+            dragged
+        } else {
+            dragged.background(ScrollTouchPass())
+        }
     }
 }
 

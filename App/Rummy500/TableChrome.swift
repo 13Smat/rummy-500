@@ -101,6 +101,8 @@ struct CardMetrics: Equatable {
 }
 
 struct WoodGrain: View {
+    @Environment(\.tableSnapshot) private var tableSnapshot
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -112,7 +114,15 @@ struct WoodGrain: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            Canvas { context, size in
+            if !tableSnapshot {
+                grain
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var grain: some View {
+        Canvas { context, size in
                 guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else {
                     return
                 }
@@ -139,9 +149,7 @@ struct WoodGrain: View {
                     y += 6
                     row += 1
                 }
-            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -205,5 +213,25 @@ struct SeatToken: View {
         .frame(width: 28, height: 28)
         .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 1))
         .accessibilityHidden(true)
+    }
+}
+
+private struct TableSnapshotKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+private struct TableHandWidthKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    var tableSnapshot: Bool {
+        get { self[TableSnapshotKey.self] }
+        set { self[TableSnapshotKey.self] = newValue }
+    }
+
+    var tableHandWidth: CGFloat {
+        get { self[TableHandWidthKey.self] }
+        set { self[TableHandWidthKey.self] = newValue }
     }
 }

@@ -2,6 +2,7 @@ import RummyEngine
 import SwiftUI
 
 struct TableScreen: View {
+    @Environment(\.tableHandWidth) private var tableHandWidth
     @State private var session: TableSession
     @GestureState private var lift: CardLift?
     @State private var layout = TableLayout(zones: [:], handSlots: [])
@@ -645,9 +646,10 @@ struct TableScreen: View {
 
     private func yourHand(_ scene: TableScene) -> some View {
         let cards = scene.yourHand
-        let reveal = TableChrome.handReveal(count: cards.count, available: handWidth)
+        let available = tableHandWidth > 1 ? tableHandWidth : handWidth
+        let reveal = TableChrome.handReveal(count: cards.count, available: available)
         let fan = TableChrome.fanWidth(count: cards.count, reveal: reveal)
-        let lead = max(0, (handWidth - fan) / 2)
+        let lead = max(0, (available - fan) / 2)
         return VStack(alignment: .leading, spacing: 0) {
             Text("Your hand \(cards.count)")
                 .font(.system(size: 11, weight: .semibold))
@@ -673,8 +675,10 @@ struct TableScreen: View {
         }
         .padding(.bottom, 4)
         .background {
-            GeometryReader { proxy in
-                Color.clear.preference(key: HandWidthKey.self, value: proxy.size.width)
+            if tableHandWidth <= 1 {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: HandWidthKey.self, value: proxy.size.width)
+                }
             }
         }
         .onPreferenceChange(HandWidthKey.self) { width in
