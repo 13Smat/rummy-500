@@ -43,8 +43,9 @@ struct TableScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .coordinateSpace(name: TableSpace.name)
         .onPreferenceChange(TableLayoutKey.self) { next in
-            if next != layout {
-                layout = next
+            let settled = next.settled()
+            if settled != layout {
+                layout = settled
             }
         }
         .overlay { liftedCard }
@@ -657,7 +658,10 @@ struct TableScreen: View {
             if tableHandWidth > 1 {
                 fan(scene.yourHand, width: tableHandWidth)
             } else {
-                fan(scene.yourHand, width: UIScreen.main.bounds.width)
+                GeometryReader { proxy in
+                    fan(scene.yourHand, width: proxy.size.width)
+                }
+                .frame(height: TableChrome.handCardHeight + 14)
             }
         }
         .padding(.bottom, 4)
@@ -665,26 +669,37 @@ struct TableScreen: View {
         .animation(.easeOut(duration: 0.2), value: session.playArea.cards)
     }
 
+    /// A hand that fits is not in a scroller. A scroller ends the drag at its
+    /// edge, so the leftmost card never reaches the discard.
+    @ViewBuilder
     private func fan(_ cards: [Card], width available: CGFloat) -> some View {
         let reveal = TableChrome.handReveal(count: cards.count, available: available)
         let spread = TableChrome.fanWidth(count: cards.count, reveal: reveal)
         let lead = max(0, (available - spread) / 2)
-        return ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: 0) {
-                Color.clear.frame(width: lead)
-                HStack(alignment: .top, spacing: reveal - TableChrome.handCardWidth) {
-                    ForEach(Array(cards.enumerated()), id: \.element) { index, card in
-                        handCard(card, index: index)
-                            .offset(y: TableChrome.handArc(index: index, count: cards.count))
-                            .zIndex(Double(index))
-                    }
-                }
-                Color.clear.frame(width: lead)
+        if spread <= available + 0.5 {
+            fanRow(cards, lead: lead, reveal: reveal)
+        } else {
+            ScrollView(.horizontal) {
+                fanRow(cards, lead: lead, reveal: reveal)
             }
-            .frame(height: TableChrome.handCardHeight + 14, alignment: .top)
+            .scrollIndicators(.hidden)
+            .frame(height: TableChrome.handCardHeight + 14)
         }
-        .scrollIndicators(.hidden)
-        .frame(height: TableChrome.handCardHeight + 14)
+    }
+
+    private func fanRow(_ cards: [Card], lead: CGFloat, reveal: CGFloat) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            Color.clear.frame(width: lead)
+            HStack(alignment: .top, spacing: reveal - TableChrome.handCardWidth) {
+                ForEach(Array(cards.enumerated()), id: \.element) { index, card in
+                    handCard(card, index: index)
+                        .offset(y: TableChrome.handArc(index: index, count: cards.count))
+                        .zIndex(Double(index))
+                }
+            }
+            Color.clear.frame(width: lead)
+        }
+        .frame(height: TableChrome.handCardHeight + 14, alignment: .top)
     }
 
     private func handCard(_ card: Card, index: Int) -> some View {

@@ -104,6 +104,10 @@ struct TableLayout: Equatable {
         }
         return latest.keys.sorted().compactMap { latest[$0] }
     }
+
+    func settled() -> TableLayout {
+        TableLayout(zones: zones, handSlots: slotsInOrder())
+    }
 }
 
 struct TableLayoutKey: PreferenceKey {
@@ -112,7 +116,13 @@ struct TableLayoutKey: PreferenceKey {
     static func reduce(value: inout TableLayout, nextValue: () -> TableLayout) {
         let next = nextValue()
         value.zones.merge(next.zones, uniquingKeysWith: { _, new in new })
-        value.handSlots.append(contentsOf: next.handSlots)
+        for slot in next.handSlots {
+            if let index = value.handSlots.firstIndex(where: { $0.index == slot.index }) {
+                value.handSlots[index] = slot
+            } else {
+                value.handSlots.append(slot)
+            }
+        }
     }
 }
 
@@ -302,6 +312,15 @@ private struct ScrollTouchPass: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
+            passTouches()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            passTouches()
+        }
+
+        private func passTouches() {
             var current: UIView? = self
             while let view = current {
                 if let scroll = view as? UIScrollView {
