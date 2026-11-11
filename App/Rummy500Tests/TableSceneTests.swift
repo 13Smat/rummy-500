@@ -109,8 +109,19 @@ final class TableSceneTests: XCTestCase {
     func testCardTargetsStayLargeEnoughToSeparateTaps() {
         XCTAssertGreaterThanOrEqual(TableChrome.cardWidth, TableChrome.minimumTap)
         XCTAssertGreaterThanOrEqual(TableChrome.cardHeight, TableChrome.minimumTap)
+        XCTAssertGreaterThanOrEqual(TableChrome.handCardWidth, TableChrome.minimumTap)
+        XCTAssertGreaterThanOrEqual(TableChrome.handCardHeight, TableChrome.minimumTap)
         XCTAssertGreaterThanOrEqual(TableChrome.discardStride, TableChrome.minimumTap)
-        XCTAssertGreaterThan(TableChrome.handGap, 0)
         XCTAssertGreaterThanOrEqual(TableChrome.minimumTap, 44)
+        XCTAssertGreaterThan(TableChrome.minimumHandReveal, TableChrome.handCardWidth / 2)
+
+        let se: CGFloat = 375
+        let reveal = TableChrome.handReveal(count: 13, available: se)
+        XCTAssertGreaterThan(reveal, TableChrome.handCardWidth / 2)
+        XCTAssertLessThanOrEqual(TableChrome.fanWidth(count: 13, reveal: reveal), se + 0.5)
+
+        let long = TableChrome.handReveal(count: 21, available: se)
+        XCTAssertGreaterThan(long, TableChrome.handCardWidth / 2)
+        XCTAssertGreaterThan(TableChrome.fanWidth(count: 21, reveal: long), se)
     }
 }

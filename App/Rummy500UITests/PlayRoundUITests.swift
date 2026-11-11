@@ -14,8 +14,11 @@ final class PlayRoundUITests: XCTestCase {
         XCTAssertFalse(app.buttons["move-left"].exists)
         XCTAssertFalse(app.buttons["move-right"].exists)
         XCTAssertFalse(app.buttons["leave-pile"].exists)
-        XCTAssertTrue(app.buttons["sort-suit"].exists)
-        XCTAssertTrue(app.buttons["sort-rank"].exists)
+        let sort = app.buttons["sort"]
+        XCTAssertTrue(sort.waitForExistence(timeout: 5))
+        XCTAssertEqual(sort.value as? String, "By suit")
+        XCTAssertFalse(app.buttons["sort-suit"].exists)
+        XCTAssertFalse(app.buttons["sort-rank"].exists)
         XCTAssertTrue(app.buttons["play"].exists)
         XCTAssertTrue(app.buttons["clear-play"].exists)
         XCTAssertEqual(app.buttons["stock"].value as? String, "Draw")
