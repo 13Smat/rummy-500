@@ -1,6 +1,7 @@
 import CoreTransferable
 import RummyEngine
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 struct DraggedCard: Hashable, Codable, Sendable, Transferable {
@@ -30,7 +31,7 @@ struct DraggedCard: Hashable, Codable, Sendable, Transferable {
     }
 }
 
-enum CardDropZone: Equatable {
+enum CardDropZone: Hashable {
     case hand
     case playArea
 }
@@ -38,6 +39,15 @@ enum CardDropZone: Equatable {
 enum CardDragIntent: Equatable {
     case stage
     case unstage
+}
+
+enum TableSpace {
+    static let name = "table"
+}
+
+struct CardLift: Equatable {
+    var payload: DraggedCard
+    var location: CGPoint
 }
 
 enum CardDragRoute {
@@ -51,21 +61,98 @@ enum CardDragRoute {
             return nil
         }
     }
+
+    static func zone(
+        for payload: DraggedCard,
+        at location: CGPoint,
+        in frames: [CardDropZone: CGRect]
+    ) -> CardDropZone? {
+        let order: [CardDropZone]
+        switch payload.origin {
+        case .hand:
+            order = [.playArea, .hand]
+        case .playArea:
+            order = [.hand, .playArea]
+        }
+        return order.first { zone in
+            guard let frame = frames[zone] else {
+                return false
+            }
+            return frame.insetBy(dx: -20, dy: -20).contains(location)
+        }
+    }
+}
+
+struct DropFramesKey: PreferenceKey {
+    static var defaultValue: [CardDropZone: CGRect] = [:]
+
+    static func reduce(
+        value: inout [CardDropZone: CGRect],
+        nextValue: () -> [CardDropZone: CGRect]
+    ) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
 }
 
 extension View {
-    func cardDrop(
-        _ zone: CardDropZone,
-        targeted: Binding<Bool>,
-        accept: @escaping (DraggedCard) -> Bool
-    ) -> some View {
-        dropDestination(for: DraggedCard.self) { items, _ in
-            guard let drag = items.first else {
-                return false
+    func reportsDropFrame(_ zone: CardDropZone) -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: DropFramesKey.self,
+                    value: [zone: proxy.frame(in: .named(TableSpace.name))]
+                )
             }
-            return accept(drag)
-        } isTargeted: { hovering in
-            targeted.wrappedValue = hovering
+        )
+    }
+
+    func tableCardDrag(
+        _ payload: DraggedCard,
+        lift: GestureState<CardLift?>,
+        onDrop: @escaping (DraggedCard, CGPoint) -> Void
+    ) -> some View {
+        background(ScrollTouchPass())
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 8, coordinateSpace: .named(TableSpace.name))
+                    .updating(lift) { value, state, _ in
+                        state = CardLift(payload: payload, location: value.location)
+                    }
+                    .onEnded { value in
+                        onDrop(payload, value.location)
+                    }
+            )
+    }
+}
+
+private struct ScrollTouchPass: UIViewRepresentable {
+    func makeUIView(context: Context) -> PassView {
+        PassView()
+    }
+
+    func updateUIView(_ uiView: PassView, context: Context) {}
+
+    final class PassView: UIView {
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isUserInteractionEnabled = false
+            backgroundColor = .clear
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            nil
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            var current: UIView? = self
+            while let view = current {
+                if let scroll = view as? UIScrollView {
+                    scroll.canCancelContentTouches = false
+                    scroll.delaysContentTouches = false
+                }
+                current = view.superview
+            }
         }
     }
 }

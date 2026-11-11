@@ -3,8 +3,8 @@ import SwiftUI
 
 struct TableScreen: View {
     @State private var session: TableSession
-    @State private var playTargeted = false
-    @State private var handTargeted = false
+    @GestureState private var lift: CardLift?
+    @State private var zoneFrames: [CardDropZone: CGRect] = [:]
 
     init(session: TableSession) {
         _session = State(initialValue: session)
@@ -48,6 +48,9 @@ struct TableScreen: View {
         .padding(.horizontal, 10)
         .padding(.bottom, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .coordinateSpace(name: TableSpace.name)
+        .onPreferenceChange(DropFramesKey.self) { zoneFrames = $0 }
+        .overlay { liftedCard }
         .task(id: session.beat) {
             guard session.computerPending else {
                 return
@@ -332,18 +335,16 @@ struct TableScreen: View {
         .contentShape(Rectangle())
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(playTargeted ? 0.22 : 0.08))
+                .fill(Color.white.opacity(zoneHighlighted(.playArea) ? 0.22 : 0.08))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(
-                    Color.white.opacity(playTargeted ? 1 : 0.5),
-                    lineWidth: playTargeted ? 3 : 1
+                    Color.white.opacity(zoneHighlighted(.playArea) ? 1 : 0.5),
+                    lineWidth: zoneHighlighted(.playArea) ? 3 : 1
                 )
         )
-        .cardDrop(.playArea, targeted: $playTargeted) { drag in
-            accept(drag, in: .playArea)
-        }
+        .reportsDropFrame(.playArea)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Play area, \(session.playArea.cards.count) cards")
         .accessibilityIdentifier("play-area")
@@ -359,11 +360,9 @@ struct TableScreen: View {
                 .padding(2)
         }
         .buttonStyle(.plain)
-        .draggable(DraggedCard.playArea(card)) {
-            CardFace(card: card).liftedForDrag()
-        }
-        .cardDrop(.playArea, targeted: $playTargeted) { drag in
-            accept(drag, in: .playArea)
+        .opacity(isLifted(DraggedCard.playArea(card)) ? 0.35 : 1)
+        .tableCardDrag(DraggedCard.playArea(card), lift: $lift) { payload, location in
+            finish(payload, at: location)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(CardLabel.spoken(card)), in the play area")
@@ -412,13 +411,33 @@ struct TableScreen: View {
         .accessibilityIdentifier(id)
     }
 
-    private func accept(_ drag: DraggedCard, in zone: CardDropZone) -> Bool {
-        let next = session.receive(drag, in: zone)
-        guard next != session else {
+    private var liftedCard: some View {
+        Group {
+            if let lift, let card = lift.payload.card(in: session.order + session.playArea.cards) {
+                CardFace(card: card, mark: session.mark(for: card))
+                    .liftedForDrag()
+                    .position(lift.location)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private func finish(_ payload: DraggedCard, at location: CGPoint) {
+        guard let zone = CardDragRoute.zone(for: payload, at: location, in: zoneFrames) else {
+            return
+        }
+        session = session.receive(payload, in: zone)
+    }
+
+    private func zoneHighlighted(_ zone: CardDropZone) -> Bool {
+        guard let lift else {
             return false
         }
-        session = next
-        return true
+        return CardDragRoute.zone(for: lift.payload, at: lift.location, in: zoneFrames) == zone
+    }
+
+    private func isLifted(_ payload: DraggedCard) -> Bool {
+        lift?.payload == payload
     }
 
     private func yourHand(_ scene: TableScene) -> some View {
@@ -435,18 +454,16 @@ struct TableScreen: View {
                 }
             }
             .scrollIndicators(.hidden)
-            .frame(height: TableChrome.cardHeight + (handTargeted ? 6 : 0))
+            .frame(height: TableChrome.cardHeight + (zoneHighlighted(.hand) ? 6 : 0))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(
-                        Color.white.opacity(handTargeted ? 0.9 : 0),
+                        Color.white.opacity(zoneHighlighted(.hand) ? 0.9 : 0),
                         lineWidth: 2
                     )
             )
         }
-        .cardDrop(.hand, targeted: $handTargeted) { drag in
-            accept(drag, in: .hand)
-        }
+        .reportsDropFrame(.hand)
         .animation(.easeOut(duration: 0.2), value: session.playArea.cards)
     }
 
@@ -458,11 +475,9 @@ struct TableScreen: View {
                 .padding(.leading, extraSuitGap(cards, index: index))
         }
         .buttonStyle(.plain)
-        .draggable(DraggedCard.hand(card)) {
-            CardFace(card: card, mark: session.mark(for: card)).liftedForDrag()
-        }
-        .cardDrop(.hand, targeted: $handTargeted) { drag in
-            accept(drag, in: .hand)
+        .opacity(isLifted(DraggedCard.hand(card)) ? 0.35 : 1)
+        .tableCardDrag(DraggedCard.hand(card), lift: $lift) { payload, location in
+            finish(payload, at: location)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(handLabel(card))

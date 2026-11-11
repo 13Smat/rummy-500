@@ -1,3 +1,4 @@
+import CoreGraphics
 import XCTest
 import RummyEngine
 @testable import Rummy500
@@ -112,6 +113,24 @@ final class PlayAreaTests: XCTestCase {
         )
         XCTAssertNil(CardDragRoute.intent(origin: .hand, zone: .hand))
         XCTAssertNil(CardDragRoute.intent(origin: .playArea, zone: .playArea))
+
+        let play = CGRect(x: 0, y: 0, width: 200, height: 80)
+        let hand = CGRect(x: 0, y: 200, width: 200, height: 80)
+        let frames: [CardDropZone: CGRect] = [.playArea: play, .hand: hand]
+        let dragged = DraggedCard.hand(seven)
+        XCTAssertEqual(
+            CardDragRoute.zone(for: dragged, at: CGPoint(x: 40, y: 40), in: frames),
+            .playArea
+        )
+        XCTAssertEqual(
+            CardDragRoute.zone(for: dragged, at: CGPoint(x: 40, y: 90), in: frames),
+            .playArea
+        )
+        XCTAssertEqual(
+            CardDragRoute.zone(for: dragged, at: CGPoint(x: 40, y: 220), in: frames),
+            .hand
+        )
+        XCTAssertNil(CardDragRoute.zone(for: dragged, at: CGPoint(x: 40, y: 140), in: frames))
 
         let ready = readyToMeld()
         let staged = ready.receive(DraggedCard.hand(seven), in: .playArea)

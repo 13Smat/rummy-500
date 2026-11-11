@@ -83,14 +83,14 @@ final class PlayRoundUITests: XCTestCase {
     }
 
     private func playArea(_ app: XCUIApplication) -> XCUIElement {
-        let named = app.descendants(matching: .any)["play-area"]
-        if named.exists {
-            return named
+        let scroll = app.scrollViews["play-area"]
+        if scroll.waitForExistence(timeout: 5) {
+            return scroll
         }
-        return app.scrollViews["play-area"]
+        return app.descendants(matching: .any)["play-area"]
     }
 
     private func drag(_ card: XCUIElement, to area: XCUIElement) {
-        card.press(forDuration: 0.8, thenDragTo: area)
+        card.press(forDuration: 0.8, thenDragTo: area, withVelocity: .slow, thenHoldForDuration: 0.4)
     }
 }
