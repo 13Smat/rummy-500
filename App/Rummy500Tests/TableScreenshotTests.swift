@@ -29,6 +29,20 @@ final class TableScreenshotTests: XCTestCase {
         render(TablePage(session: refused), name: "play-refused", size: size)
         let computer = TableSession(preset: .midHand, playsLive: false).stepComputer()
         render(TablePage(session: computer), name: "play-computer", size: size)
+        renderPlayArea(size)
+    }
+
+    @MainActor
+    private func renderPlayArea(_ size: CGSize) {
+        let seven = Card(rank: .seven, suit: .hearts)
+        let eight = Card(rank: .eight, suit: .hearts)
+        let nine = Card(rank: .nine, suit: .hearts)
+        let ready = TableSession(hand: HandState.scriptedPlay()[1], match: .opening, playsLive: false)
+        render(TablePage(session: ready), name: "play-area-empty", size: size)
+        let two = ready.stage(seven).stage(eight)
+        render(TablePage(session: two), name: "play-area-invalid", size: size)
+        let three = two.stage(nine)
+        render(TablePage(session: three), name: "play-area-valid", size: size)
     }
 
     @MainActor

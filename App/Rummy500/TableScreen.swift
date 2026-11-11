@@ -3,6 +3,8 @@ import SwiftUI
 
 struct TableScreen: View {
     @State private var session: TableSession
+    @State private var playTargeted = false
+    @State private var handTargeted = false
 
     init(session: TableSession) {
         _session = State(initialValue: session)
@@ -35,6 +37,8 @@ struct TableScreen: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             piles(scene)
+                .layoutPriority(1)
+            playRow
                 .layoutPriority(1)
             yourHand(scene)
                 .layoutPriority(1)
@@ -100,6 +104,9 @@ struct TableScreen: View {
                 .accessibilityIdentifier("phase")
             if let mustUse = session.mustUseText {
                 banner(mustUse, identifier: "must-use")
+            }
+            if let refusal = session.playRefusal {
+                banner(refusal, identifier: "play-refusal")
             }
             if let notice = session.notice {
                 banner(notice, identifier: "notice")
@@ -292,6 +299,128 @@ struct TableScreen: View {
         }
     }
 
+    private var playRow: some View {
+        HStack(alignment: .center, spacing: 8) {
+            playZone
+            roundButton("X", id: "clear-play", label: "Return cards to your hand") {
+                session = session.clearPlayArea()
+            }
+            playButton
+        }
+    }
+
+    private var playZone: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                if session.playArea.cards.isEmpty {
+                    Text("Drag cards here")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(minHeight: TableChrome.cardHeight)
+                } else {
+                    ForEach(session.playArea.cards, id: \.self) { card in
+                        stagedCard(card)
+                    }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+        }
+        .scrollIndicators(.hidden)
+        .frame(minHeight: TableChrome.cardHeight + 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(playTargeted ? 0.22 : 0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(
+                    Color.white.opacity(playTargeted ? 1 : 0.5),
+                    lineWidth: playTargeted ? 3 : 1
+                )
+        )
+        .cardDrop(.playArea, targeted: $playTargeted) { drag in
+            accept(drag, in: .playArea)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Play area, \(session.playArea.cards.count) cards")
+        .accessibilityIdentifier("play-area")
+        .animation(.easeOut(duration: 0.2), value: session.playArea.cards)
+    }
+
+    private func stagedCard(_ card: Card) -> some View {
+        Button {
+            session = session.unstage(card)
+        } label: {
+            CardFace(card: card)
+                .scaleEffect(1.06)
+                .padding(2)
+        }
+        .buttonStyle(.plain)
+        .draggable(DraggedCard.playArea(card)) {
+            CardFace(card: card).liftedForDrag()
+        }
+        .cardDrop(.playArea, targeted: $playTargeted) { drag in
+            accept(drag, in: .playArea)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(CardLabel.spoken(card)), in the play area")
+        .accessibilityIdentifier(TableCardID.staged(card))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Return to hand") {
+            session = session.unstage(card)
+        }
+    }
+
+    private var playButton: some View {
+        Button {
+            session = session.playStaged()
+        } label: {
+            Text("Play")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(session.playIsEnabled ? TableChrome.chipInk : .white)
+                .frame(minWidth: 64, minHeight: TableChrome.minimumTap)
+                .background(
+                    Color.white.opacity(session.playIsEnabled ? 0.92 : 0.16),
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(!session.playIsEnabled)
+        .accessibilityLabel("Play")
+        .accessibilityIdentifier("play")
+        .accessibilityValue(session.playIsEnabled ? "Enabled" : "Disabled")
+    }
+
+    private func roundButton(
+        _ title: String,
+        id: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(minWidth: TableChrome.minimumTap, minHeight: TableChrome.minimumTap)
+                .background(Color.white.opacity(0.16), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(id)
+    }
+
+    private func accept(_ drag: DraggedCard, in zone: CardDropZone) -> Bool {
+        let next = session.receive(drag, in: zone)
+        guard next != session else {
+            return false
+        }
+        session = next
+        return true
+    }
+
     private func yourHand(_ scene: TableScene) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Your hand \(scene.yourHand.count)")
@@ -301,23 +430,50 @@ struct TableScreen: View {
             ScrollView(.horizontal) {
                 HStack(spacing: TableChrome.handGap) {
                     ForEach(Array(scene.yourHand.enumerated()), id: \.element) { index, card in
-                        Button {
-                            session = session.toggle(card)
-                        } label: {
-                            CardFace(card: card, mark: session.mark(for: card))
-                                .padding(.leading, extraSuitGap(scene.yourHand, index: index))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(handLabel(card))
-                        .accessibilityIdentifier(TableCardID.hand(card))
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityAddTraits(session.selected.contains(card) ? .isSelected : [])
+                        handCard(card, in: scene.yourHand, index: index)
                     }
                 }
             }
             .scrollIndicators(.hidden)
-            .frame(height: TableChrome.cardHeight)
+            .frame(height: TableChrome.cardHeight + (handTargeted ? 6 : 0))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(
+                        Color.white.opacity(handTargeted ? 0.9 : 0),
+                        lineWidth: 2
+                    )
+            )
+        }
+        .cardDrop(.hand, targeted: $handTargeted) { drag in
+            accept(drag, in: .hand)
+        }
+        .animation(.easeOut(duration: 0.2), value: session.playArea.cards)
+    }
+
+    private func handCard(_ card: Card, in cards: [Card], index: Int) -> some View {
+        Button {
+            session = session.toggle(card)
+        } label: {
+            CardFace(card: card, mark: session.mark(for: card))
+                .padding(.leading, extraSuitGap(cards, index: index))
+        }
+        .buttonStyle(.plain)
+        .draggable(DraggedCard.hand(card)) {
+            CardFace(card: card, mark: session.mark(for: card)).liftedForDrag()
+        }
+        .cardDrop(.hand, targeted: $handTargeted) { drag in
+            accept(drag, in: .hand)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(handLabel(card))
+        .accessibilityIdentifier(TableCardID.hand(card))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(session.selected.contains(card) ? .isSelected : [])
+        .accessibilityAction(named: "Select") {
+            session = session.toggle(card)
+        }
+        .accessibilityAction(named: "Move to play area") {
+            session = session.stage(card)
         }
     }
 
